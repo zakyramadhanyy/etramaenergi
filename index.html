@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="id">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,12 +8,14 @@
   <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <!-- ASUMSI: plugin forms dari Tailwind Play CDN dipakai agar input/select konsisten lintas browser. -->
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <script src="assets/js/tailwind.config.js"></script>
   <link rel="stylesheet" href="assets/css/custom.css">
 </head>
+
 <body class="min-h-screen bg-slate-50 font-sans text-slate-900">
   <!-- ASUMSI: kedua portal memakai halaman login yang sama; tujuan setelah login ditentukan role user (US-FN-01 poin 3). -->
   <div class="relative flex min-h-screen flex-col">
@@ -22,51 +25,73 @@
 
     <header class="relative mx-auto flex w-full max-w-5xl items-center gap-3 px-6 pt-8">
       <img src="assets/img/etrama-logo-white.png" alt="ETrama Energy Company" class="h-10 w-auto">
-      <p class="border-l border-white/20 pl-3 text-xs font-medium uppercase tracking-[0.1em] text-blue-200">Finance Module 1.0 &amp; Super Admin</p>
+      <p class="border-l border-white/20 pl-3 text-xs font-medium uppercase tracking-[0.1em] text-blue-200">Finance
+        Module 1.0 &amp; Super Admin</p>
     </header>
 
     <main class="relative mx-auto w-full max-w-5xl flex-1 px-6 pb-12 pt-14">
-      <h1 class="text-3xl font-semibold tracking-tight text-white">Pilih portal</h1>
-      <p class="mt-2 max-w-xl text-sm text-blue-100">Masuk sesuai tugas Anda. Akses menu di dalam portal mengikuti role dan level hierarki akun.</p>
+      <h1 class="text-3xl font-semibold tracking-tight text-white">Pilih portals</h1>
+      <p class="mt-2 max-w-xl text-sm text-blue-100">Masuk sesuai tugas Anda. Akses menu di dalam portal mengikuti role
+        dan level hierarki akun.</p>
 
       <div class="mt-10 grid gap-5 md:grid-cols-2">
-        <a href="auth/login.html?portal=finance" class="group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-brand-blue hover:shadow-md sm:p-7">
+        <a href="auth/login.html?portal=finance"
+          class="group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-brand-blue hover:shadow-md sm:p-7">
           <div class="flex items-start justify-between">
-            <span class="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand-navy" data-icon="briefcase"></span>
-            <span class="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Staf · Lead · Manager · Direktur</span>
+            <span class="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand-navy"
+              data-icon="briefcase"></span>
+            <span class="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Staf · Lead · Manager ·
+              Direktur</span>
           </div>
           <h2 class="mt-5 text-lg font-semibold text-slate-900">Finance</h2>
-          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">Sales Order &amp; AI baca ToP, BAST, invoice dengan review dua lapis, piutang &amp; penagihan, PO dan pembayaran vendor, approval, serta report.</p>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">Sales Order &amp; AI baca ToP, BAST, invoice dengan
+            review dua lapis, piutang &amp; penagihan, PO dan pembayaran vendor, approval, serta report.</p>
           <ul class="mt-5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-slate-700">
-            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-blue"></span>Sales Order</li>
+            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-blue"></span>Sales Order
+            </li>
             <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-blue"></span>Invoice</li>
             <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-blue"></span>Piutang</li>
-            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-blue"></span>PO &amp; vendor</li>
+            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-blue"></span>PO &amp;
+              vendor</li>
           </ul>
-          <span class="mt-7 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue">Masuk ke Finance <span class="transition group-hover:translate-x-0.5" data-icon="arrowRight"></span></span>
+          <span class="mt-7 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue">Masuk ke Finance
+            <span class="transition group-hover:translate-x-0.5" data-icon="arrowRight"></span></span>
         </a>
 
-        <a href="auth/login.html?portal=super-admin" class="group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-brand-blue hover:shadow-md sm:p-7">
+        <a href="auth/login.html?portal=super-admin"
+          class="group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-brand-blue hover:shadow-md sm:p-7">
           <div class="flex items-start justify-between">
             <span class="grid h-11 w-11 place-items-center rounded-xl bg-brand-navy text-white" data-icon="key"></span>
-            <span class="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Konfigurasi sistem</span>
+            <span class="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Konfigurasi
+              sistem</span>
           </div>
           <h2 class="mt-5 text-lg font-semibold text-slate-900">Super Admin</h2>
-          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">Master data client, vendor &amp; Staf BD, user dan role, hierarki, approval &amp; budget threshold, SLA dan hari libur, pengaturan dokumen, serta log history.</p>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">Master data client, vendor &amp; Staf BD, user dan
+            role, hierarki, approval &amp; budget threshold, SLA dan hari libur, pengaturan dokumen, serta log history.
+          </p>
           <ul class="mt-5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-slate-700">
-            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-navy"></span>Master data</li>
-            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-navy"></span>User &amp; role</li>
-            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-navy"></span>Approval &amp; SLA</li>
-            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-navy"></span>Log history</li>
+            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-navy"></span>Master data
+            </li>
+            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-navy"></span>User &amp;
+              role</li>
+            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-navy"></span>Approval
+              &amp; SLA</li>
+            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand-navy"></span>Log history
+            </li>
           </ul>
-          <span class="mt-7 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue">Masuk ke Super Admin <span class="transition group-hover:translate-x-0.5" data-icon="arrowRight"></span></span>
+          <span class="mt-7 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue">Masuk ke Super Admin
+            <span class="transition group-hover:translate-x-0.5" data-icon="arrowRight"></span></span>
         </a>
       </div>
 
-      <p class="mt-8 flex items-start gap-2 text-sm text-slate-600"><span class="mt-0.5 text-slate-400" data-icon="info"></span>Super Admin hanya mengelola konfigurasi dan tidak ikut menyetujui transaksi (pemisahan tugas). <a href="index.html" class="font-medium text-brand-blue hover:underline">Lihat panduan &amp; alur UX</a></p>
+      <p class="mt-8 flex items-start gap-2 text-sm text-slate-600"><span class="mt-0.5 text-slate-400"
+          data-icon="info"></span>Super Admin hanya mengelola konfigurasi dan tidak ikut menyetujui transaksi (pemisahan
+        tugas). <a href="index.html" class="font-medium text-brand-blue hover:underline">Lihat panduan &amp; alur UX</a>
+      </p>
     </main>
 
-    <footer class="relative pb-6 text-center text-xs text-slate-500">© 2026 ETrama · Prototipe UI dengan data simulasi</footer>
+    <footer class="relative pb-6 text-center text-xs text-slate-500">© 2026 ETrama · Prototipe UI dengan data simulasi
+    </footer>
   </div>
 
   <script src="assets/js/mock-data.js"></script>
@@ -78,4 +103,5 @@
     });
   </script>
 </body>
+
 </html>
