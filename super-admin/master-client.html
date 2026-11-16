@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Master Client · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div id="table"></div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'super-admin', active: 'master-client', title: 'Master Client', breadcrumb: ['Super Admin', 'Master Data', 'Client'] });
+    View.masterCrud(document.getElementById('table'), {
+      coll: 'clients', keyField: 'code', codePrefix: 'CL-', entityLabel: 'Client', nameLabel: 'Nama perusahaan', hasPic: true,
+      futureFields: ['Kontak PIC', 'Alamat', 'NPWP'], usageLabel: 'Sales Order',
+      usage: (r) => DB.all('salesOrders').filter((s) => s.clientCode === r.code).length,
+    });
+  </script>
+</body>
+</html>

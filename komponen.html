@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Referensi Komponen · ETrama</title>
+  <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <!-- ASUMSI: halaman internal untuk meninjau komponen bersama. Bukan bagian produk; tidak ada di sitemap dan boleh dihapus. -->
+  <main class="mx-auto max-w-content space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+    <header class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Internal · bukan bagian produk</p>
+        <h1 class="mt-1 text-2xl font-semibold tracking-tight">Referensi komponen</h1>
+        <p class="mt-1 text-sm text-slate-600">Komponen di <code class="font-mono text-xs">assets/js/ui.js</code> yang dipakai ulang di semua halaman.</p>
+      </div>
+      <a href="portal.html" class="text-sm font-semibold text-brand-blue hover:underline">← Pilih portal</a>
+    </header>
+
+<!-- Standar tipografi & tabel — acuan untuk semua halaman baru. -->
+    <section class="card" aria-labelledby="ty-title">
+      <div class="card-head"><div><h2 id="ty-title" class="card-title">Skala tipografi · Plus Jakarta Sans</h2><p class="card-sub">Hanya ukuran ini yang dipakai. Headline 16 → sub 14 atau 12; headline 20/24 → sub 14.</p></div></div>
+      <div class="overflow-x-auto"><table class="tbl"><thead><tr><th>Token</th><th class="!text-right">Ukuran / line-height (px)</th><th>Pemakaian</th><th>Contoh</th></tr></thead><tbody><tr><td><code class="font-mono text-xs">text-3xs</code></td><td class="r">8 / 12</td><td class="text-slate-600">Label sangat kecil di chart / dokumen PDF</td><td><span class="text-3xs text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-2xs</code></td><td class="r">10 / 14</td><td class="text-slate-600">Badge mini, tag, legenda kecil</td><td><span class="text-2xs text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-xs</code></td><td class="r">12 / 16</td><td class="text-slate-600">Keterangan (sub), header tabel, hint form, breadcrumb</td><td><span class="text-xs text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-sm</code></td><td class="r">14 / 20</td><td class="text-slate-600">Teks isi, isi tabel, label form, tombol, menu sidebar</td><td><span class="text-sm text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-base</code></td><td class="r">16 / 24</td><td class="text-slate-600">Judul kartu / section (bold)</td><td><span class="text-base font-bold text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-xl</code></td><td class="r">20 / 28</td><td class="text-slate-600">Judul halaman di header (bold)</td><td><span class="text-xl font-bold text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-2xl</code></td><td class="r">24 / 32</td><td class="text-slate-600">Judul detail dokumen</td><td><span class="text-2xl font-bold text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-3xl</code></td><td class="r">32 / 40</td><td class="text-slate-600">Angka ringkasan besar</td><td><span class="text-3xl font-extrabold text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-4xl</code></td><td class="r">40 / 48</td><td class="text-slate-600">Angka KPI utama</td><td><span class="text-4xl font-extrabold text-slate-900">Aa</span></td></tr><tr><td><code class="font-mono text-xs">text-5xl – 9xl</code></td><td class="r">48 · 56 · 64 · 72 · 80</td><td class="text-slate-600">Hero / layar khusus</td><td><span class="text-5xl font-extrabold text-slate-900">Aa</span></td></tr></tbody></table></div>
+    </section>
+    <section class="card overflow-hidden" aria-labelledby="tb-title">
+      <div class="card-head"><div><h2 id="tb-title" class="card-title">Standar tabel</h2><p class="card-sub">Header 12 semibold abu · isi 14 · keterangan 12 · nomor dokumen mono 12 · uang rata kanan · satu aksi utama per baris, sisanya di menu ⋯.</p></div></div>
+      <div class="overflow-x-auto"><table class="tbl min-w-[720px]">
+        <thead><tr><th>Dokumen</th><th>Client</th><th class="!text-right">Nilai</th><th>Status</th><th class="!text-right">Aksi</th></tr></thead>
+        <tbody>
+          <tr><td><p class="t-main">Invoice termin 1</p><p class="t-doc">INV/ETR/2026/11/0002</p></td><td><p class="t-main !font-medium">Sekolah Global Insani</p><p class="t-sub">PLTS Atap Gedung Sekolah</p></td><td class="r"><span class="t-main">Rp 138.195.000</span><p class="t-sub">DP 30%</p></td><td><span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-600">Draft</span></td><td class="r"><button type="button" class="btn btn-secondary btn-sm">Lihat</button></td></tr>
+          <tr><td><p class="t-main">Invoice termin 3</p><p class="t-doc">INV/ETR/2026/10/0044</p></td><td><p class="t-main !font-medium">Hotel Samudra Indah</p><p class="t-sub">PLTS Atap Hotel Nusa Dua</p></td><td class="r"><span class="t-main">Rp 108.780.000</span><p class="t-sub">Setelah BAST 10%</p></td><td><span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-[#E0FAEC] text-[#178C4E]">Disetujui</span></td><td class="r"><button type="button" class="btn btn-secondary btn-sm">Lihat</button></td></tr>
+        </tbody>
+      </table></div>
+      <div class="card-body !pt-4 text-sm text-slate-600"><p class="font-semibold text-slate-900">Kelas yang dipakai</p>
+        <ul class="mt-2 list-disc space-y-1 pl-5"><li><code class="font-mono text-xs">.tbl</code>: tabel standar (header 12, isi 14, kolom pertama/terakhir 24px).</li><li><code class="font-mono text-xs">.t-main</code> teks utama 14 semibold · <code class="font-mono text-xs">.t-sub</code> keterangan 12 · <code class="font-mono text-xs">.t-doc</code> nomor dokumen mono 12.</li><li><code class="font-mono text-xs">.r</code>: angka/uang rata kanan dengan tabular-nums.</li><li>Tabel dibungkus <code class="font-mono text-xs">.card</code> + <code class="font-mono text-xs">.overflow-x-auto</code>; header menempel ke tepi kartu.</li></ul></div>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 class="text-sm font-semibold">Badge status</h2>
+      <div id="badges" class="mt-4 space-y-3 text-sm"></div>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 class="text-sm font-semibold">Countdown SLA (hari kerja)</h2>
+      <div id="sla" class="mt-4 flex flex-wrap gap-2"></div>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 class="text-sm font-semibold">Format</h2>
+      <dl id="format" class="mt-4 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2"></dl>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 class="text-sm font-semibold">Modal konfirmasi, toast, tooltip</h2>
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button type="button" id="btn-confirm" class="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue-hover">Konfirmasi biasa</button>
+        <button type="button" id="btn-note" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Kembalikan (catatan wajib)</button>
+        <button type="button" id="btn-toast" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Toast</button>
+        <span id="tip"></span>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="mb-3 text-sm font-semibold">Tabel data (search, filter, sort, pagination) — data client</h2>
+      <div id="table"></div>
+    </section>
+
+    <section>
+      <h2 class="mb-3 text-sm font-semibold">Tabel kosong (empty state)</h2>
+      <div id="table-empty"></div>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white shadow-sm" data-tabs>
+      <div role="tablist" aria-label="Contoh tab" class="flex gap-6 border-b border-slate-200 px-5">
+        <button role="tab" aria-selected="true" aria-controls="tab-a" id="t-a" class="-mb-px border-b-2 py-3 text-sm font-semibold">Ringkasan</button>
+        <button role="tab" aria-selected="false" aria-controls="tab-b" id="t-b" class="-mb-px border-b-2 py-3 text-sm font-semibold">Riwayat</button>
+      </div>
+      <div id="tab-a" role="tabpanel" aria-labelledby="t-a" class="p-5 text-sm text-slate-600">Isi tab Ringkasan.</div>
+      <div id="tab-b" role="tabpanel" aria-labelledby="t-b" class="p-5 text-sm text-slate-600">Isi tab Riwayat.</div>
+    </section>
+  </main>
+
+  <script src="assets/js/mock-data.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script>
+
+    const groups = {
+      Invoice: ['Draft', 'Review Lead F&A', 'Review Manager', 'Disetujui', 'Dikembalikan', 'Terkirim'],
+      Piutang: ['Belum Jatuh Tempo', 'Overdue', 'On Hold', 'Dieskalasi', 'Partially Paid', 'Paid'],
+      'PO vendor': ['Open', 'Partially Invoiced', 'Fully Invoiced', 'Closed'],
+      'Master data': ['Aktif', 'Nonaktif'],
+    };
+    document.getElementById('badges').innerHTML = Object.entries(groups).map(([g, list]) =>
+      `<div class="flex flex-wrap items-center gap-2"><span class="w-28 text-xs font-medium text-slate-500">${g}</span>${list.map((s) => UI.badge(s)).join('')}</div>`).join('');
+    document.getElementById('sla').innerHTML = [3, 1, 0, -2].map((n) => UI.slaBadge(n)).join('') + UI.slaBadge(1, { label: 'Review Lead F&A' });
+    document.getElementById('format').innerHTML = [
+      ['formatRupiah(1250000000)', UI.formatRupiah(1250000000)],
+      ['formatDate(now)', UI.formatDate(new Date())],
+      ['formatTime(now)', UI.formatTime(new Date())],
+      ['formatDateTime(now)', UI.formatDateTime(new Date())],
+    ].map(([k, v]) => `<div class="flex justify-between gap-4 border-b border-slate-100 py-1.5"><dt class="font-mono text-xs text-slate-500">${k}</dt><dd class="num font-medium">${v}</dd></div>`).join('');
+
+    document.getElementById('tip').outerHTML = UI.disabledButton('Approve', 'Anda tidak dapat menyetujui dokumen yang Anda buat sendiri.');
+
+    document.getElementById('btn-confirm').addEventListener('click', async () => {
+      const r = await UI.confirm({ title: 'Kirim invoice untuk review?', message: 'Invoice akan diteruskan ke Lead F&A dengan SLA review H+1 hari kerja.', confirmText: 'Kirim' });
+      if (r.confirmed) UI.toast('Invoice dikirim ke Lead F&A.');
+    });
+    document.getElementById('btn-note').addEventListener('click', async () => {
+      const r = await UI.confirm({
+        title: 'Kembalikan invoice?', message: 'Invoice dikembalikan ke Staf Finance untuk diperbaiki.', confirmText: 'Kembalikan', tone: 'danger',
+        note: { required: true, label: 'Catatan pengembalian', placeholder: 'Jelaskan bagian yang perlu diperbaiki' },
+      });
+      if (r.confirmed) UI.toast(`Dikembalikan dengan catatan: "${r.note}"`, { type: 'warning' });
+    });
+    document.getElementById('btn-toast').addEventListener('click', () => {
+      UI.toast('Data client tersimpan.');
+      UI.toast('File melebihi 10 MB.', { type: 'error' });
+    });
+
+    new UI.DataTable(document.getElementById('table'), {
+      data: MOCK.clients,
+      pageSize: 10,
+      searchPlaceholder: 'Cari kode, nama, atau PIC…',
+      searchKeys: ['code', 'name', 'pic'],
+      filters: [{ key: 'status', label: 'Status', options: ['Aktif', 'Nonaktif'] }],
+      columns: [
+        { key: 'code', label: 'Kode', sortable: true, render: (r) => `<span class="font-mono text-xs">${r.code}</span>` },
+        { key: 'name', label: 'Nama perusahaan', sortable: true, render: (r) => `<span class="font-medium text-slate-900">${UI.esc(r.name)}</span>` },
+        { key: 'pic', label: 'Nama PIC', sortable: true },
+        { key: 'status', label: 'Status', render: (r) => UI.badge(r.status) },
+        { key: 'nilai', label: 'Contoh nilai', align: 'right', numeric: true, render: (r) => UI.formatRupiah(150000000 + r.code.slice(-2) * 137500000) },
+      ],
+    });
+    new UI.DataTable(document.getElementById('table-empty'), {
+      data: [],
+      columns: [{ key: 'a', label: 'No. SO' }, { key: 'b', label: 'Client' }, { key: 'c', label: 'Nilai', align: 'right' }],
+      empty: { icon: 'fileText', title: 'Belum ada Sales Order', description: 'Sales Order yang diinput dari SPK, PO Klien, atau Kontrak Kerja akan tampil di sini.' },
+    });
+  </script>
+</body>
+</html>

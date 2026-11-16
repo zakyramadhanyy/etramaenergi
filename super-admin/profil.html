@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profil · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="grid gap-5 xl:grid-cols-[1fr_1fr]">
+    <section class="card self-start" aria-labelledby="pf-title">
+      <div class="card-body flex items-center gap-4 border-b border-slate-200">
+        <span id="avatar" class="grid h-14 w-14 place-items-center rounded-full bg-brand-soft text-lg font-semibold text-brand-navy"></span>
+        <div><h2 id="pf-title" class="text-lg font-semibold text-slate-900"></h2><p id="pf-email" class="text-sm text-slate-600"></p></div>
+      </div>
+      <dl id="pf" class="divide-y divide-slate-100 text-sm"></dl>
+      <p class="px-5 py-3 text-xs text-slate-500">Nama, role, level, dan atasan diatur oleh Super Admin melalui User Management.</p>
+    </section>
+    <section class="card self-start" aria-labelledby="pw-title">
+      <div class="card-head"><h2 id="pw-title" class="card-title">Ganti password</h2></div>
+      <form id="pw-form" class="card-body space-y-4" novalidate>
+        <input type="email" id="username" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true">
+        <div data-field><label class="label" for="cur">Password saat ini <span class="req">*</span></label><input id="cur" type="password" autocomplete="current-password" class="input" required></div>
+        <div data-field><label class="label" for="pw">Password baru <span class="req">*</span></label><input id="pw" type="password" autocomplete="new-password" class="input" required aria-describedby="rules"><ul id="rules" class="mt-2 space-y-1 text-xs"></ul></div>
+        <div data-field><label class="label" for="pw2">Konfirmasi password baru <span class="req">*</span></label><input id="pw2" type="password" autocomplete="new-password" class="input" required></div>
+        <div class="flex justify-end"><button class="btn btn-primary" type="submit">Simpan password</button></div>
+      </form>
+    </section>
+    <section class="card xl:col-span-2" aria-labelledby="act-title">
+      <div class="card-head"><h2 id="act-title" class="card-title">Aktivitas terakhir saya</h2><span class="text-xs text-slate-500">Dari log history</span></div>
+      <div id="act" class="card-body"></div>
+    </section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'super-admin', active: 'profil', title: 'Profil', breadcrumb: ['Super Admin', 'Akun', 'Profil'] });
+    const u = ctx.user; const r = MOCK.roles[u.role];
+    document.getElementById('avatar').textContent = u.name.split(' ').slice(0, 2).map((w) => w[0]).join('');
+    document.getElementById('pf-title').textContent = u.name;
+    document.getElementById('pf-email').textContent = u.email;
+    document.getElementById('username').value = u.email;
+    const role = DB.find('rolesList', (x) => x.id === u.roleId);
+    document.getElementById('pf').innerHTML = [
+      ['Role akses', role ? role.name : '—'], ['Jabatan', r.label], ['Level hierarki', r.level],
+      ['Atasan langsung', u.supervisorId ? DB.user(u.supervisorId).name : '—'], ['Login terakhir', u.lastLogin ? UI.formatDateTime(u.lastLogin) : '—'],
+    ].map(([k, v]) => `<div class="flex justify-between gap-4 px-5 py-3"><dt class="text-slate-500">${k}</dt><dd class="text-right font-medium text-slate-900">${UI.esc(v)}</dd></div>`).join('');
+    const mine = DB.all('logs').filter((l) => l.userId === u.id).slice(0, 8);
+    document.getElementById('act').innerHTML = View.timeline(mine.map((l) => ({ at: l.at, title: `${l.action}${l.docNo !== '—' ? ' · ' + l.docNo : ''}`, by: l.module, note: l.reason, tone: View.toneOf(l.action) })));
+
+    const pw = document.getElementById('pw'); const rules = document.getElementById('rules');
+    UI.renderPasswordRules(rules, ''); pw.addEventListener('input', () => UI.renderPasswordRules(rules, pw.value));
+    document.getElementById('pw-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = e.target; const cur = f.querySelector('#cur'); const pw2 = f.querySelector('#pw2');
+      if (!UI.validateRequired(f)) return;
+      if (!Auth.checkPassword(u, cur.value)) { UI.fieldError(cur, 'Password saat ini salah'); cur.focus(); return; }
+      if (!UI.passwordRules(pw.value).every((x) => x.ok)) { UI.fieldError(pw, 'Password belum memenuhi semua ketentuan'); pw.focus(); return; }
+      if (pw.value === cur.value) { UI.fieldError(pw, 'Password baru harus berbeda dari password saat ini'); pw.focus(); return; }
+      if (pw2.value !== pw.value) { UI.fieldError(pw2, 'Konfirmasi password tidak sama'); pw2.focus(); return; }
+      Auth.setPassword(u.id, pw.value);
+      DB.log({ action: 'Mengganti password', module: 'Akun' });
+      f.reset(); UI.renderPasswordRules(rules, '');
+      UI.toast('Password berhasil diganti.');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laporan Umur Piutang · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-8">
+    <div id="kpi" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4"></div>
+
+    <section aria-labelledby="ag-title">
+      <h2 id="ag-title" class="card-title">Ringkasan umur piutang</h2>
+      <p class="card-sub">Per <span class="num">02/11/2026</span> · klik untuk memfilter</p>
+      <div id="ag-bar" class="mt-4 flex h-2 gap-1" role="img" aria-label="Proporsi piutang terbuka per kelompok umur"></div>
+      <div id="aging" class="mt-4 grid gap-4 sm:grid-cols-3 xl:grid-cols-5"></div>
+    </section>
+
+    <section id="rem-card" class="hidden" aria-labelledby="rem-title">
+      <div class="sect-head"><div><h2 id="rem-title" class="card-title">Reminder jatuh tempo hari ini</h2><p class="card-sub">Konfirmasi jadwal bayar ke klien</p></div><span id="rem-count"></span></div>
+      <ul id="rem" class="list-flat mt-3"></ul>
+    </section>
+
+    <section aria-labelledby="list-title">
+      <h2 id="list-title" class="card-title">Daftar piutang</h2>
+      <p class="card-sub">Invoice terbuka ditampilkan lebih dulu, yang sudah lunas di bagian bawah</p>
+      <div id="tabs" role="tablist" aria-label="Filter status piutang" class="seg-group mt-4"></div>
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <div class="relative min-w-[240px] flex-1 sm:max-w-sm"><span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400" data-icon="search"></span><label class="sr-only" for="q">Cari</label><input id="q" type="search" placeholder="Cari client atau no. invoice…" class="input !mt-0 !h-11 !pl-10"></div>
+        <label class="sr-only" for="f-bucket">Umur</label><select id="f-bucket" class="input !mt-0 !h-11 !w-auto"><option value="">Semua umur</option></select>
+        <label class="sr-only" for="f-client">Client</label><select id="f-client" class="input !mt-0 !h-11 !w-auto"><option value="">Semua client</option></select>
+        <button type="button" id="export" class="btn btn-secondary ml-auto"><span data-icon="download"></span>Export Excel</button>
+      </div>
+      <div class="mt-4 overflow-x-auto"><table class="tbl min-w-[860px]">
+        <thead><tr><th>Client · invoice</th><th class="!text-right">Sisa tagihan</th><th>Jatuh tempo</th><th>Status</th><th>Aktivitas terakhir</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <p id="foot" class="mt-4 text-sm text-slate-500"></p>
+    </section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'finance', active: 'piutang', title: 'Laporan Umur Piutang', breadcrumb: ['Finance', 'Piutang'], perm: 'piutang' });
+    const { esc, formatRupiah: rp } = UI;
+    const all = Calc.receivables().sort((a, b) => b.overdue - a.overdue);
+    const open = all.filter((x) => x.arStatus !== 'Paid');
+    const s = (arr) => Calc.sum(arr, (x) => x.outstanding);
+    const by = (st) => open.filter((x) => x.arStatus === st);
+    document.getElementById('kpi').innerHTML = [
+      View.kpi('Total piutang', rp(s(open)), `${open.length} invoice terbuka`, { icon: 'coins' }),
+      View.kpi('Overdue', rp(s(open.filter((x) => x.overdue > 0))), `${open.filter((x) => x.overdue > 0).length} invoice lewat jatuh tempo`, { icon: 'alert', iconCls: 'text-red-600', valueCls: 'text-red-700' }),
+      View.kpi('On Hold', rp(s(by('On Hold'))), `${by('On Hold').length} invoice · reminder & eskalasi dijeda`, { icon: 'pause', iconCls: 'text-amber-600' }),
+      View.kpi('Dieskalasi', rp(s(by('Dieskalasi'))), `${by('Dieskalasi').length} invoice ke Manager & Direksi`, { icon: 'arrowUp', iconCls: 'text-orange-600' }),
+    ].join('');
+
+    const BUCKET_COLOR = ['bg-slate-400', 'bg-amber-400', 'bg-orange-500', 'bg-red-500', 'bg-red-800'];
+    const totalOpen = s(open) || 1;
+    document.getElementById('ag-bar').innerHTML = Calc.BUCKETS.map((b, i) => { const v = s(open.filter((x) => x.bucket === b)); return v ? `<span class="${BUCKET_COLOR[i]} rounded-full" style="width:${(v / totalOpen) * 100}%"></span>` : ''; }).join('');
+    document.getElementById('aging').innerHTML = Calc.BUCKETS.map((b, i) => { const l = open.filter((x) => x.bucket === b); return `<button type="button" data-bucket="${esc(b)}" class="rounded-xl p-2 text-left hover:bg-slate-50 focus-visible:bg-slate-50"><p class="flex items-center gap-2 text-xs text-slate-500"><span class="h-2 w-2 rounded-full ${BUCKET_COLOR[i]}"></span>${b}</p><p class="mt-1 text-base font-bold text-slate-900 num">${rp(s(l))}</p><p class="mt-0.5 text-xs text-slate-500">${l.length} invoice</p></button>`; }).join('');
+
+    const rem = open.map((x) => Object.assign(x, { remDue: Calc.reminderDue(x) })).filter((x) => x.remDue);
+    if (rem.length) {
+      document.getElementById('rem-card').classList.remove('hidden');
+      document.getElementById('rem-count').innerHTML = `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 num">${rem.length} reminder</span>`;
+      document.getElementById('rem').innerHTML = rem.map((x) => `<li class="flex flex-wrap items-center gap-4 py-4"><span class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">${esc(x.remDue)}</span><span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-slate-900">${esc(x.clientName)} · jatuh tempo ${UI.formatDate(x.due)}</span><span class="mt-0.5 block font-mono text-xs text-slate-500">${esc(x.no)} · ${rp(x.outstanding)}</span></span><a class="btn btn-secondary btn-sm" href="piutang-detail.html?no=${encodeURIComponent(x.no)}">${Layout.can('piutang', 'buat') ? 'Catat hasil konfirmasi' : 'Lihat status'}</a></li>`).join('');
+    }
+
+    /* ---------- Daftar: tab + filter + grup ---------- */
+    const paid = all.filter((x) => x.arStatus === 'Paid').sort((a, b) => b.due.localeCompare(a.due));
+    const TABS = [['semua', 'Semua', () => true], ['terbuka', 'Terbuka', (x) => x.arStatus !== 'Paid'], ['overdue', 'Overdue', (x) => x.arStatus !== 'Paid' && x.overdue > 0], ['onhold', 'On Hold', (x) => x.arStatus === 'On Hold'], ['eskalasi', 'Dieskalasi', (x) => x.arStatus === 'Dieskalasi'], ['lunas', 'Lunas', (x) => x.arStatus === 'Paid']];
+    let tab = 'semua';
+    const $ = (id) => document.getElementById(id);
+    $('f-bucket').insertAdjacentHTML('beforeend', Calc.BUCKETS.map((b) => `<option>${esc(b)}</option>`).join(''));
+    $('f-client').insertAdjacentHTML('beforeend', [...new Set(all.map((x) => x.clientName))].sort().map((c) => `<option>${esc(c)}</option>`).join(''));
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.dataset.icon, 'w-4 h-4'); });
+
+    const matches = () => {
+      const t = TABS.find((x) => x[0] === tab)[2]; const q = $('q').value.trim().toLowerCase();
+      return all.filter((x) => t(x) && (!$('f-bucket').value || x.bucket === $('f-bucket').value) && (!$('f-client').value || x.clientName === $('f-client').value)
+        && (!q || [x.clientName, x.no, x.soNo, x.lastNote].some((v) => String(v || '').toLowerCase().includes(q))));
+    };
+    function renderTabs() {
+      $('tabs').innerHTML = TABS.map(([k, l, f]) => { const n = all.filter(f).length; return `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}" class="seg">${l}${['terbuka', 'overdue', 'onhold', 'eskalasi'].includes(k) ? ` <span class="num text-slate-500">${n}</span>` : ''}</button>`; }).join('');
+      $('tabs').querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { tab = b.dataset.tab; render(); }));
+    }
+    const dueSub = (x) => (x.outstanding ? (x.overdue ? `<p class="mt-0.5 text-xs font-medium text-red-700">lewat ${x.overdue} hari · ${esc(x.bucket)}</p>` : `<p class="mt-0.5 text-xs text-slate-500">${Cal.daysBetween(MOCK.today, x.due)} hari lagi</p>`) : '<p class="mt-0.5 text-xs text-slate-500">Lunas</p>');
+    const row = (x) => `<tr class="${x.arStatus === 'Paid' ? 'opacity-80' : ''}">
+      <td><p class="text-sm ${x.arStatus === 'Paid' ? 'font-medium' : 'font-semibold'} text-slate-900">${esc(x.clientName)}</p><p class="mt-0.5">${View.arLink(x.no)}</p></td>
+      <td class="r"><span class="text-sm font-bold num ${x.overdue > 0 && x.outstanding ? 'text-red-700' : 'text-slate-900'}">${rp(x.outstanding)}</span>${x.paid ? `<p class="mt-0.5 text-xs font-normal text-slate-500">dari ${rp(x.total)}</p>` : ''}</td>
+      <td><p class="text-sm font-semibold text-slate-900 num">${UI.formatDate(x.due)}</p>${dueSub(x)}</td>
+      <td>${UI.badge(x.arStatus)}${x.ar.checked ? '' : (x.ar.payments || []).length ? `<p class="mt-1">${UI.badge('Belum dicek')}</p>` : ''}</td>
+      <td class="max-w-[280px] !whitespace-normal">${x.lastReminder || x.lastNote ? `${x.lastReminder ? `<p class="text-xs text-slate-500">Reminder terakhir · <span class="num">${UI.formatDate(x.lastReminder)}</span></p>` : ''}${x.lastNote ? `<p class="mt-0.5 text-xs text-slate-700">${esc(x.lastNote)}</p>` : ''}` : '<span class="text-slate-300">—</span>'}</td></tr>`;
+    const group = (title, n) => `<tr><td colspan="5" class="!border-b-0 !pb-1 !pt-8"><p class="flex items-center gap-2 text-sm font-bold text-slate-900">${title} <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 num">${n}</span></p></td></tr>`;
+    function render() {
+      renderTabs();
+      const list = matches();
+      const op = list.filter((x) => x.arStatus !== 'Paid'); const pd = list.filter((x) => x.arStatus === 'Paid');
+      $('rows').innerHTML = list.length
+        ? (op.length ? group('Perlu tindak lanjut', op.length) + op.map(row).join('') : '') + (pd.length ? group('Lunas', pd.length) + pd.map(row).join('') : '')
+        : `<tr><td colspan="5">${UI.emptyState({ icon: 'search', title: 'Tidak ada hasil', description: 'Ubah filter atau kata kunci pencarian.' })}</td></tr>`;
+      $('foot').textContent = `Menampilkan ${list.length} invoice`;
+    }
+    ['q', 'f-bucket', 'f-client'].forEach((id) => $(id).addEventListener('input', render));
+    document.querySelectorAll('[data-bucket]').forEach((b) => b.addEventListener('click', () => { $('f-bucket').value = b.dataset.bucket; tab = 'terbuka'; render(); $('list-title').scrollIntoView({ behavior: 'smooth' }); }));
+    $('export').addEventListener('click', () => UI.exportCsv(`laporan-piutang-${MOCK.today}`, [['Client', 'No. invoice', 'Nilai', 'Dibayar', 'Sisa', 'Jatuh tempo', 'Umur', 'Status', 'Reminder terakhir', 'Catatan terakhir'], ...matches().map((x) => [x.clientName, x.label, x.total, x.paid, x.outstanding, UI.formatDate(x.due), x.bucket, x.arStatus, x.lastReminder ? UI.formatDate(x.lastReminder) : '', x.lastNote])]));
+    render();
+  </script>
+</body>
+</html>

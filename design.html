@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panduan Prototipe ETrama</title>
+  <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="assets/css/custom.css">
+  <style>
+    html { scroll-behavior: smooth; }
+    section[id] { scroll-margin-top: 5rem; }
+    .flow-tab[aria-selected="true"] { background: #fff; color: #171717; box-shadow: 0 1px 2px rgba(10,13,20,.06); border-color: #EBEBEB; }
+    .step-line::before { content: ''; position: absolute; left: 15px; top: 36px; bottom: -12px; width: 1px; background: #EBEBEB; }
+    .step-line:last-child::before { display: none; }
+  </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-900">
+  <!-- ASUMSI: halaman ini khusus prototipe (bukan bagian produk) — menjelaskan isi dan alur UX untuk stakeholder sebelum mencoba layar. -->
+
+  <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
+      <img src="assets/img/etrama-logo.png" alt="ETrama Energy Company" class="h-8 w-auto">
+      <p class="hidden truncate border-l border-slate-200 pl-3 text-xs text-slate-500 sm:block">Panduan prototipe · Finance Module 1.0 &amp; Super Admin</p>
+      <nav class="ml-auto hidden items-center gap-1 text-sm text-slate-600 md:flex" aria-label="Bagian halaman">
+        <a href="#isi-prototipe" class="rounded-lg px-3 py-1.5 hover:bg-slate-100">Isi</a>
+        <a href="#role" class="rounded-lg px-3 py-1.5 hover:bg-slate-100">Role</a>
+        <a href="#alur" class="rounded-lg px-3 py-1.5 hover:bg-slate-100">Alur UX</a>
+        <a href="#status" class="rounded-lg px-3 py-1.5 hover:bg-slate-100">Status</a>
+        <a href="#catatan" class="rounded-lg px-3 py-1.5 hover:bg-slate-100">Catatan</a>
+      </nav>
+      <a href="portal.html" class="btn btn-primary btn-sm ml-auto md:ml-2">Mulai prototipe <span data-icon="arrowRight"></span></a>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl space-y-14 px-4 pb-20 pt-10 sm:px-6">
+
+    <!-- Ringkasan -->
+    <section id="ringkasan" class="overflow-hidden rounded-[24px] bg-brand-navy text-white">
+      <div class="relative px-6 py-10 sm:px-10 sm:py-12">
+        <div class="solar-grid pointer-events-none absolute inset-0 opacity-60"></div>
+        <div class="relative max-w-3xl">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-blue-100 ring-1 ring-white/15"><span data-icon="info"></span>Prototipe UI · data simulasi</span>
+          <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">Dari Sales Order sampai pembayaran, dalam satu sistem.</h1>
+          <p class="mt-4 text-base leading-relaxed text-blue-100">Prototipe ini mendigitalkan SOP 01.001-00 “Pembuatan &amp; Penagihan Invoice”. Halaman ini menjelaskan apa saja yang ada di dalamnya, siapa yang memakainya, dan bagaimana alur kerjanya. Setiap langkah punya tombol <b class="font-semibold text-white">Buka layar</b> untuk langsung mencoba.</p>
+          <div class="mt-7 flex flex-wrap gap-3">
+            <a href="#alur" class="btn bg-white text-brand-navy hover:bg-blue-50">Lihat alur UX</a>
+            <a href="portal.html" class="btn border border-white/25 bg-white/5 text-white hover:bg-white/10">Masuk lewat halaman login</a>
+          </div>
+        </div>
+        <dl id="hero-stats" class="relative mt-10 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4"></dl>
+      </div>
+    </section>
+
+    <!-- Cara pakai -->
+    <section aria-labelledby="h-tips">
+      <h2 id="h-tips" class="text-xl font-semibold tracking-tight">Cara memakai prototipe</h2>
+      <p class="mt-1 text-sm text-slate-600">Lima hal yang perlu diketahui sebelum mencoba.</p>
+      <div id="tips" class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-5"></div>
+    </section>
+
+    <!-- Isi prototipe -->
+    <section id="isi-prototipe" aria-labelledby="h-isi">
+      <h2 id="h-isi" class="text-xl font-semibold tracking-tight">Apa saja yang ada di dalamnya</h2>
+      <p class="mt-1 text-sm text-slate-600">Dua portal dengan <span id="page-count"></span> layar. Klik kartu untuk membuka layarnya.</p>
+      <div id="modules" class="mt-6 space-y-8"></div>
+    </section>
+
+    <!-- Role -->
+    <section id="role" aria-labelledby="h-role">
+      <h2 id="h-role" class="text-xl font-semibold tracking-tight">Siapa memakai apa</h2>
+      <p class="mt-1 text-sm text-slate-600">Ada 2 role sistem: Super Admin dan Admin Finance. Wewenang Admin Finance ditentukan level hierarki. Super Admin tidak ikut menyetujui transaksi (pemisahan tugas).</p>
+      <div class="card mt-5 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="tbl min-w-[760px]">
+            <thead><tr><th>Role</th><th>Tugas utama di sistem</th><th>Yang dilihat di dashboard</th><th class="w-40"></th></tr></thead>
+            <tbody id="roles"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Alur UX -->
+    <section id="alur" aria-labelledby="h-alur">
+      <h2 id="h-alur" class="text-xl font-semibold tracking-tight">Alur UX</h2>
+      <p class="mt-1 text-sm text-slate-600">Pilih alur. Setiap langkah menyebut siapa yang mengerjakan, layar yang dipakai, dan apa yang bisa dicoba.</p>
+      <div class="mt-5 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-1" role="tablist" id="flow-tabs" aria-label="Pilih alur"></div>
+      <div id="flow-panel" class="mt-5" role="tabpanel"></div>
+    </section>
+
+    <!-- Status -->
+    <section id="status" aria-labelledby="h-status">
+      <h2 id="h-status" class="text-xl font-semibold tracking-tight">Status dan aturan yang terlihat di layar</h2>
+      <p class="mt-1 text-sm text-slate-600">Warna badge konsisten di semua halaman, dan status selalu ditulis sebagai teks.</p>
+      <div class="mt-5 grid gap-4 lg:grid-cols-2">
+        <div class="card"><div class="card-head"><h3 class="card-title">Siklus status dokumen</h3></div><div id="lifecycles" class="card-body space-y-5"></div></div>
+        <div class="card"><div class="card-head"><h3 class="card-title">Aturan bisnis yang ditegakkan UI</h3></div><ul id="rules" class="card-body space-y-3 text-sm"></ul></div>
+      </div>
+      <div class="card mt-4"><div class="card-head"><h3 class="card-title">SLA (hari kerja, Senin–Jumat di luar hari libur)</h3></div><div id="sla" class="card-body grid gap-2 sm:grid-cols-2 lg:grid-cols-3"></div></div>
+    </section>
+
+    <!-- Catatan -->
+    <section id="catatan" aria-labelledby="h-catatan">
+      <h2 id="h-catatan" class="text-xl font-semibold tracking-tight">Batasan prototipe</h2>
+      <ul class="card card-body mt-5 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+        <li class="flex gap-2.5"><span class="mt-0.5 text-slate-400" data-icon="database"></span>Tidak ada server. Semua data dummy dan perubahan tersimpan di browser masing-masing, jadi orang lain tidak melihat perubahan Anda.</li>
+        <li class="flex gap-2.5"><span class="mt-0.5 text-slate-400" data-icon="clock"></span>Tanggal sistem disimulasikan <b class="font-semibold">02/11/2026</b>, agar badge SLA, umur piutang, dan reminder tampil bervariasi.</li>
+        <li class="flex gap-2.5"><span class="mt-0.5 text-slate-400" data-icon="sliders"></span>Hasil “AI baca ToP” adalah simulasi. Di produk, hasil AI tetap wajib direview manusia sebelum dikonfirmasi.</li>
+        <li class="flex gap-2.5"><span class="mt-0.5 text-slate-400" data-icon="mail"></span>Email (password sementara, link reset, kirim invoice) tidak benar-benar terkirim. Sistem hanya menampilkan konfirmasinya.</li>
+        <li class="flex gap-2.5"><span class="mt-0.5 text-slate-400" data-icon="file"></span>Tombol Export Excel/PDF hanya berfungsi saat prototipe dibuka langsung dari folder proyek; di halaman pratinjau ini unduhan dan cetak diblokir browser.</li>
+        <li class="flex gap-2.5"><span class="mt-0.5 text-slate-400" data-icon="x"></span>Di luar lingkup v1.0: Procurement, CRM, Cost Control, akses Staf BD &amp; Lead Project, jurnal akuntansi, transfer bank otomatis, e-Faktur.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">ETrama · Finance Module 1.0 &amp; Super Admin · Prototipe UI berdasarkan PRD 1.0</footer>
+
+  <script src="assets/js/mock-data.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script>
+    const { icon, esc, badge } = UI;
+    const $ = (id) => document.getElementById(id);
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon, 'w-4 h-4'); });
+
+    /* ---------- Data panduan ---------- */
+    const ROLE = {
+      staf: { label: 'Staff', tone: 'bg-blue-50 text-blue-700' },
+      lead: { label: 'Lead', tone: 'bg-violet-50 text-violet-700' },
+      mgr_ops: { label: 'Manager', tone: 'bg-amber-50 text-amber-700' },
+      direktur: { label: 'Direktur', tone: 'bg-emerald-50 text-emerald-700' },
+      sa: { label: 'Super Admin', tone: 'bg-slate-200 text-slate-800' },
+      ext: { label: 'Di luar sistem', tone: 'bg-white text-slate-500 ring-1 ring-inset ring-slate-200' },
+      sys: { label: 'Sistem', tone: 'bg-brand-soft text-brand-navy' },
+    };
+    const roleChip = (k) => `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROLE[k].tone}">${ROLE[k].label}</span>`;
+    // Link layar: data-as menyetel "Lihat sebagai" sebelum membuka halaman Finance.
+    const open = (href, as, label) => `<a href="${esc(href)}" ${as && as !== 'sa' ? `data-as="${as}"` : ''} class="btn btn-secondary btn-sm">${esc(label || 'Buka layar')} ${icon('arrowRight', 'w-3.5 h-3.5')}</a>`;
+    const enc = encodeURIComponent;
+
+    const TIPS = [
+      ['key', 'Masuk tanpa login', 'Semua layar bisa dibuka langsung. Untuk mencoba login, pakai panel <b class="font-semibold">Akun demo</b> di halaman login.'],
+      ['users', '“Lihat sebagai”', 'Admin Finance dibedakan oleh level hierarki (Staff, Lead, Manager, Direktur). Ganti level di header untuk melihat menu, tombol, dan dashboard yang berbeda.'],
+      ['bell', 'Notifikasi & cari', 'Lonceng di header berisi tugas yang menunggu Anda. Tekan <b class="font-semibold">Ctrl+K</b> untuk mencari menu atau nomor dokumen.'],
+      ['database', 'Data bisa diubah', 'Aksi Anda (approve, catat bayar, tambah client) benar-benar mengubah data demo dan tercatat di log history.'],
+      ['undo', 'Reset data', 'Kembalikan ke data awal lewat <b class="font-semibold">Reset data</b> di bagian bawah sidebar.'],
+    ];
+
+    const MODULES = [
+      { portal: 'Finance', desc: 'Dipakai Staf Finance, Lead F&A, Manager, dan Direktur.', groups: [
+        { name: 'Penjualan & penagihan', items: [
+          ['clipboard', 'Sales Order', 'Daftar, input SO dengan AI baca ToP, detail per tab.', 'finance/sales-order-list.html'],
+          ['badgeCheck', 'BAST', 'Unggah BAST dari Lead Project sebagai pemicu termin.', 'finance/bast.html'],
+          ['receipt', 'Invoice', 'Draft, review dua lapis, revisi, kirim + transmittal.', 'finance/invoice-list.html'],
+          ['coins', 'Piutang', 'Umur piutang, reminder, On Hold, eskalasi, catat bayar.', 'finance/piutang.html'],
+        ] },
+        { name: 'Vendor', items: [
+          ['cart', 'Purchase Order', 'PO ke vendor dan progres penagihannya.', 'finance/po-list.html'],
+          ['fileText', 'Invoice vendor', 'Catat invoice vendor, cek kesesuaian dengan PO.', 'finance/invoice-vendor.html'],
+          ['card', 'Pembayaran vendor', 'Catat pembayaran dan lihat riwayatnya.', 'finance/pembayaran-vendor.html'],
+        ] },
+        { name: 'Persetujuan & laporan', items: [
+          ['dashboard', 'Dashboard', 'Ringkasan yang berbeda per role.', 'finance/dashboard.html'],
+          ['checkCheck', 'Approval', 'Antrean invoice yang menunggu review Anda.', 'finance/approval.html', 'lead'],
+          ['chart', 'Report Sales Order', 'Tren bulanan, nilai SO, status penagihan.', 'finance/report-sales-order.html'],
+          ['chart', 'Report Piutang', 'Total, overdue, per umur & client, On Hold.', 'finance/report-piutang.html'],
+          ['bell', 'Notifikasi', 'Riwayat lengkap notifikasi lonceng.', 'finance/notifikasi.html'],
+        ] },
+      ] },
+      { portal: 'Super Admin', desc: 'Konfigurasi inti sistem. Tidak ikut menyetujui transaksi.', groups: [
+        { name: 'Master data', items: [
+          ['briefcase', 'Client', 'Kode otomatis, PIC, status, peringatan nama duplikat.', 'super-admin/master-client.html'],
+          ['cart', 'Vendor', 'Pemasok panel, inverter, kabel, jasa instalasi.', 'super-admin/master-vendor.html'],
+          ['user', 'Staf BD', 'Nama dan status, dipakai di form SO.', 'super-admin/master-staf-bd.html'],
+        ] },
+        { name: 'Akses', items: [
+          ['users', 'User Management', 'Tambah user, reset password, paksa logout.', 'super-admin/user-management.html'],
+          ['shield', 'Role Management', 'Role kustom dan matriks permission per menu.', 'super-admin/role-management.html'],
+          ['network', 'Hierarki Role', 'Staff → Lead → Manager → Direktur.', 'super-admin/hierarki-role.html'],
+        ] },
+        { name: 'Aturan & dokumen', items: [
+          ['sliders', 'Approval Setting', 'Layer approval dan budget threshold bertingkat.', 'super-admin/approval-setting.html'],
+          ['clock', 'SLA & Reminder', 'Nilai SLA, jadwal reminder, hari libur.', 'super-admin/sla-reminder.html'],
+          ['stamp', 'Pengaturan Dokumen', 'Kop, rekening, stempel, TTD, preview invoice live.', 'super-admin/pengaturan-dokumen.html'],
+          ['history', 'Log History', 'Jejak audit read-only: siapa, apa, kapan, kenapa.', 'super-admin/log-history.html'],
+        ] },
+      ] },
+      { portal: 'Akun', desc: 'Dipakai semua user di kedua portal.', groups: [
+        { name: 'Autentikasi', items: [
+          ['lock', 'Login', 'Pesan error sesuai PRD dan panel akun demo.', 'auth/login.html?portal=finance'],
+          ['key', 'Ganti password', 'Wajib saat login pertama dengan password sementara.', 'auth/ganti-password.html'],
+          ['mail', 'Lupa & reset password', 'Link sekali pakai, berlaku 30 menit.', 'auth/lupa-password.html'],
+          ['user', 'Profil', 'Data akun dan ubah password.', 'finance/profil.html'],
+        ] },
+      ] },
+    ];
+
+    const ROLES = [
+      ['staf', 'Input SO & BAST, buat dan kirim invoice, penagihan, catat bayar, PO dan vendor.', 'Tugas hari ini, invoice yang harus dibuat, SLA yang hampir lewat.'],
+      ['lead', 'Review invoice layer 1, verifikasi laporan piutang, putuskan piutang bermasalah.', 'Antrean review, invoice dikembalikan, piutang dieskalasi.'],
+      ['mgr_ops', 'Review invoice layer 2 dan menerima eskalasi piutang. Selesai di sini jika nilai di bawah threshold.', 'Antrean approval dan nilai invoice yang disetujui.'],
+      ['direktur', 'Approve invoice di atas budget threshold, putuskan piutang bermasalah.', 'Invoice di atas threshold dan ringkasan keuangan.'],
+      ['sa', 'Kelola master data, user, role, approval, SLA, dokumen. Melihat semua log.', 'Ringkasan user, master data, dan aktivitas terbaru.'],
+    ];
+
+    const FLOWS = [
+      { id: 'o2c', title: 'Sales Order → Invoice', lead: 'Alur utama: dokumen klien masuk, termin dibaca AI, lalu invoice per termin dibuat.', steps: [
+        { who: 'ext', title: 'Dokumen klien diterima dari BD', body: 'SPK, PO Klien, atau Kontrak dikirim Staf BD lewat WA Grup/email. Jika diterima lebih dari H+1 hari kerja, form SO menampilkan banner keterlambatan.' },
+        { who: 'staf', title: 'Input Sales Order', body: 'Wizard 2 langkah. Langkah 1: jenis dokumen, client (PIC terisi otomatis), Staf BD, lokasi, kWp, unggah dokumen, dan item; DPP, PPN 11%, dan Nilai Kontrak dihitung otomatis.', open: ['finance/sales-order-form.html', 'staf'] },
+        { who: 'sys', title: 'Langkah 2: AI membaca Term of Payment', body: 'AI mulai membaca begitu dokumen diunggah. Setiap termin punya skor keyakinan dan potongan teks asli di sampingnya. Field berkeyakinan rendah ditandai kuning. Jika AI gagal, tersedia form ToP manual.', try: 'Ubah persentase termin: indikator “Total termin” berubah dan tombol simpan terkunci selama totalnya bukan 100%.' },
+        { who: 'staf', title: 'Konfirmasi ToP & simpan', body: 'Hasil AI wajib direview manusia. Tombol simpan aktif setelah Konfirmasi ToP ditekan dan Σ% = 100% serta Σ nominal = Total SO.' },
+        { who: 'staf', title: 'Pantau di detail SO', body: 'Tab Ringkasan, ToP, Invoice, Dokumen, dan Riwayat. Progres penagihan per termin terlihat di bagian atas.', open: [`finance/sales-order-detail.html?no=${enc('SO/ETR/2026/11/0001')}`, 'staf', 'Buka SO/ETR/2026/11/0001'] },
+        { who: 'staf', title: 'Unggah BAST (termin berbasis milestone)', body: 'Termin seperti “10% setelah BAST” baru bisa ditagih setelah BAST diunggah (SLA H+1). Upload lewat modal; dari detail SO, SO dan termin terisi otomatis.', open: [`finance/bast.html?so=${enc('SO/ETR/2026/11/0001')}&term=2`, 'staf', 'Coba upload BAST'] },
+        { who: 'staf', title: 'Buat invoice termin', body: 'Invoice dibuat sebagai Draft (SLA H+3). Preview PDF ber-watermark DRAFT tanpa stempel/TTD. Rekening hanya dipilih dari daftar.', open: [`finance/invoice-detail.html?no=${enc('INV/ETR/2026/11/0002')}`, 'staf', 'Buka invoice Draft'] },
+        { who: 'staf', title: 'Ajukan review', body: 'Invoice masuk ke antrean Lead F&A dan notifikasi terkirim. Lanjutkan ke alur “Review & approval invoice”.' },
+      ] },
+      { id: 'review', title: 'Review & approval invoice', lead: 'Dua lapis review dengan budget threshold. Reviewer tidak bisa menyetujui dokumen buatannya sendiri.', steps: [
+        { who: 'lead', title: 'Notifikasi “menunggu review”', body: 'Lonceng di header menampilkan badge jumlah belum dibaca. Klik notifikasi untuk membuka dokumen dan menandainya dibaca.' },
+        { who: 'lead', title: 'Antrean Approval', body: 'Daftar invoice yang menunggu Anda, lengkap dengan countdown SLA (H+1). Merah jika sudah lewat.', open: ['finance/approval.html', 'lead'] },
+        { who: 'lead', title: 'Review layer 1: Lead F&A', body: 'Approve untuk meneruskan, atau Kembalikan dengan catatan wajib (tombol terkunci sampai catatan diisi).', open: [`finance/invoice-detail.html?no=${enc('INV/ETR/2026/10/0047')}`, 'lead', 'Coba review'], try: `Buka <span class="font-mono">INV/ETR/2026/11/0003</span>: tombol Approve terkunci karena invoice dibuat oleh Lead sendiri.` },
+        { who: 'mgr_ops', title: 'Review layer 2: Manager', body: 'Jika nilai ≤ Rp 500.000.000, invoice langsung Disetujui di sini.', open: [`finance/invoice-detail.html?no=${enc('INV/ETR/2026/10/0049')}`, 'mgr_ops', 'Coba review'] },
+        { who: 'direktur', title: 'Review Direktur (di atas threshold)', body: 'Invoice bernilai ≥ Rp 500.000.000 diteruskan ke Direktur. Batas dan tier diatur Super Admin.', open: [`finance/invoice-detail.html?no=${enc('INV/ETR/2026/10/0050')}`, 'direktur', 'Coba review'] },
+        { who: 'staf', title: 'Disetujui → kirim ke klien', body: 'Stempel dan TTD muncul di PDF. Staf Finance mengirim invoice beserta form transmittal (SLA H+1), lalu status menjadi Terkirim dan piutang tercatat.', open: [`finance/invoice-detail.html?no=${enc('INV/ETR/2026/10/0044')}`, 'staf', 'Buka invoice Disetujui'] },
+        { who: 'staf', title: 'Jika dikembalikan: revisi', body: 'Catatan reviewer tampil di atas invoice. Revisi membuat versi Rev.1, Rev.2, dan seterusnya; versi lama tetap tersimpan di riwayat.', open: [`finance/invoice-detail.html?no=${enc('INV/ETR/2026/10/0042')}`, 'staf', 'Buka invoice Dikembalikan'] },
+      ] },
+      { id: 'ar', title: 'Piutang & penagihan', lead: 'Setelah invoice terkirim: pantau umur piutang, kirim reminder, tangani masalah, dan catat pembayaran.', steps: [
+        { who: 'staf', title: 'Pantau umur piutang', body: 'Kelompok umur: belum jatuh tempo, 1–30, 31–60, 61–90, >90 hari. Filter per status dan client.', open: ['finance/piutang.html', 'staf'] },
+        { who: 'sys', title: 'Reminder H-14 & H-7', body: 'Sistem mengingatkan Staf Finance sebelum jatuh tempo. Reminder yang dikirim dicatat beserta kanal (email/telepon) dan catatannya.' },
+        { who: 'staf', title: 'Tangani overdue atau On Hold', body: 'Kirim pemberitahuan ulang, atau tandai On Hold dengan catatan wajib (misalnya klien menunggu dokumen).', open: [`finance/piutang-detail.html?no=${enc('INV/ETR/2026/09/0021')}`, 'staf', 'Buka detail piutang'] },
+        { who: 'sys', title: 'Eskalasi H+30', body: 'Piutang yang belum dibayar 30 hari kerja sejak pemberitahuan terakhir otomatis berstatus Dieskalasi dan dikirim ke atasan.' },
+        { who: 'lead', title: 'Keputusan piutang bermasalah', body: 'Lead F&A dan Direktur memutuskan tindak lanjut. Manager memantau.' },
+        { who: 'staf', title: 'Catat pembayaran', body: 'Pembayaran sebagian membuat status Partially Paid; pembayaran lunas membuat status Paid (SLA H+1).' },
+        { who: 'lead', title: 'Verifikasi laporan piutang', body: 'Total, overdue, per umur dan client, daftar On Hold & Dieskalasi. Export Excel & PDF.', open: ['finance/report-piutang.html', 'lead'] },
+      ] },
+      { id: 'vendor', title: 'Vendor (PO → bayar)', lead: 'Sisi pengeluaran: PO ke vendor, invoice vendor dicocokkan dengan PO, lalu dicatat pembayarannya.', steps: [
+        { who: 'staf', title: 'Buat Purchase Order', body: 'Pilih vendor aktif, isi item dan nilai. PO berstatus Open.', open: ['finance/po-form.html', 'staf'] },
+        { who: 'staf', title: 'Catat invoice vendor', body: 'Input lewat modal, dikaitkan ke PO. Jika nilainya tidak cocok, muncul peringatan. Klik baris untuk drawer detail dengan tahapan Cost Control/Budget Control (di luar sistem).', open: ['finance/invoice-vendor.html', 'staf'], try: 'Cari invoice <span class="font-mono">RBS-INV-0218</span> untuk melihat contoh ketidaksesuaian.' },
+        { who: 'staf', title: 'Catat pembayaran vendor', body: 'Tanpa approval (sesuai Approval Setting). Status Partially Paid atau Paid, riwayat tersimpan.', open: ['finance/pembayaran-vendor.html', 'staf'] },
+        { who: 'sys', title: 'PO Closed', body: 'Setelah semua invoice vendor lunas, PO bisa ditutup.', open: ['finance/po-list.html', 'staf', 'Buka daftar PO'] },
+      ] },
+      { id: 'setup', title: 'Setup Super Admin', lead: 'Konfigurasi yang menentukan perilaku portal Finance. Semua perubahan tercatat di log history.', steps: [
+        { who: 'sa', title: 'Isi master data', body: 'Client dan vendor mendapat kode otomatis (CL-0001, VD-0001). Nama yang mirip memunculkan peringatan kuning. Data yang sudah dipakai hanya bisa dinonaktifkan.', open: ['super-admin/master-client.html', 'sa'], try: 'Tambah client bernama “Surya Energi” untuk melihat peringatan duplikat.' },
+        { who: 'sa', title: 'Tambah user', body: 'Nama, email unik, role, level hierarki, dan atasan langsung. Password sementara dikirim via email; user wajib menggantinya saat login pertama.', open: ['super-admin/user-management.html', 'sa'] },
+        { who: 'sa', title: 'Atur role & hierarki', body: 'Buat role kustom (misalnya “Finance Viewer”) dengan matriks lihat/buat/edit/hapus/approve/export. Role bawaan tidak bisa dihapus.', open: ['super-admin/role-management.html', 'sa'] },
+        { who: 'sa', title: 'Atur approval & threshold', body: 'Step approval invoice bisa ditambah, dihapus, dan diurutkan, lengkap dengan toggle “wajib” dan “lewati otomatis”. Minimal satu step harus aktif. Threshold nominal bisa ditambah dan diaktifkan per baris.', open: ['super-admin/approval-setting.html', 'sa'] },
+        { who: 'sa', title: 'Atur SLA, reminder, hari libur', body: 'SLA dihitung hari kerja Senin–Jumat di luar daftar hari libur.', open: ['super-admin/sla-reminder.html', 'sa'] },
+        { who: 'sa', title: 'Atur dokumen invoice', body: 'Kop, rekening bank (satu default), stempel, penandatangan, catatan kaki, format nomor, dengan preview invoice live. Perubahan hanya berlaku untuk dokumen baru.', open: ['super-admin/pengaturan-dokumen.html', 'sa'] },
+        { who: 'sa', title: 'Audit di log history', body: 'Siapa, apa, kapan (WIB), di mana, kenapa, dan nilai sebelum/sesudah. Tidak ada tombol edit atau hapus.', open: ['super-admin/log-history.html', 'sa'] },
+      ] },
+      { id: 'akun', title: 'Akun & login', lead: 'Alur masuk untuk semua user.', steps: [
+        { who: 'ext', title: 'Pilih portal', body: 'Finance atau Super Admin. Keduanya memakai halaman login yang sama.', open: ['portal.html', null, 'Buka pemilih portal'] },
+        { who: 'staf', title: 'Login', body: 'Pesan error mengikuti PRD: “Email belum terdaftar” atau “Email atau password salah”. Setelah login, user diarahkan ke dashboard sesuai role.', open: ['auth/login.html?portal=finance', null, 'Buka login'] },
+        { who: 'staf', title: 'Login pertama → ganti password', body: 'User baru dengan password sementara wajib membuat password baru yang memenuhi aturan (indikator aturan tampil langsung).', try: 'Di panel Akun demo, pilih <b class="font-semibold">Fajar Nugroho</b>.' },
+        { who: 'staf', title: 'Lupa password', body: 'Masukkan email; link reset sekali pakai dan berlaku 30 menit. Di prototipe, link ditampilkan langsung di layar.', open: ['auth/lupa-password.html', null, 'Buka lupa password'] },
+        { who: 'staf', title: 'Profil & keluar', body: 'Ubah data akun dan password dari menu profil. Logout tercatat di log history.' },
+      ] },
+    ];
+
+    const LIFECYCLES = [
+      ['Invoice', ['Draft', 'Review Lead F&A', 'Review Manager', 'Disetujui', 'Terkirim'], ['Dikembalikan']],
+      ['Piutang', ['Belum Jatuh Tempo', 'Overdue', 'Partially Paid', 'Paid'], ['On Hold', 'Dieskalasi']],
+      ['PO vendor', ['Open', 'Partially Invoiced', 'Fully Invoiced', 'Closed'], []],
+      ['Master data', ['Aktif', 'Nonaktif'], []],
+    ];
+    const RULES = [
+      ['alert', 'Catatan wajib saat mengembalikan invoice, On Hold, reject, cancel, atau revisi.'],
+      ['lock', 'Reviewer tidak bisa approve dokumen buatannya sendiri.'],
+      ['stamp', 'Stempel & TTD hanya muncul setelah invoice Disetujui; Draft ber-watermark DRAFT.'],
+      ['card', 'Rekening di invoice hanya dipilih dari daftar, tidak bisa diketik bebas.'],
+      ['sliders', 'Invoice ≥ Rp 500.000.000 lanjut ke Direktur (threshold nominal).'],
+      ['history', 'Log history read-only, bahkan untuk Super Admin.'],
+      ['xCircle', 'Data master yang sudah dipakai tidak bisa dihapus, hanya dinonaktifkan.'],
+    ];
+    const SLA = [['Buat invoice', 'H+3'], ['Review Lead F&A', 'H+1'], ['Review Manager', 'H+1'], ['Info ketidaksesuaian', 'H+0'], ['Kirim invoice', 'H+1'], ['Reminder', 'H-14 & H-7'], ['Eskalasi piutang', 'H+30'], ['Catat pembayaran', 'H+1'], ['Dokumen dari BD / BAST', 'H+1']];
+
+    /* ---------- Render ---------- */
+    const pageCount = MODULES.reduce((n, m) => n + m.groups.reduce((a, g) => a + g.items.length, 0), 0);
+    $('page-count').textContent = `${pageCount}+`;
+    $('hero-stats').innerHTML = [['2', 'portal'], ['6', 'role'], [`${FLOWS.length}`, 'alur utama'], [`${pageCount}+`, 'layar']]
+      .map(([v, l]) => `<div class="rounded-xl bg-white/5 px-4 py-3 ring-1 ring-white/10"><dt class="text-xs text-blue-200">${l}</dt><dd class="mt-1 text-2xl font-semibold">${v}</dd></div>`).join('');
+
+    $('tips').innerHTML = TIPS.map(([ic, t, d]) => `
+      <div class="card card-body">
+        <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand-soft text-brand-navy">${icon(ic, 'w-4 h-4')}</span>
+        <h3 class="mt-3 text-sm font-semibold">${t}</h3>
+        <p class="mt-1 text-sm leading-relaxed text-slate-600">${d}</p>
+      </div>`).join('');
+
+    $('modules').innerHTML = MODULES.map((m) => `
+      <div>
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1"><h3 class="text-base font-semibold">${m.portal}</h3><p class="text-sm text-slate-500">${m.desc}</p></div>
+        <div class="mt-3 grid gap-4 md:grid-cols-${Math.min(m.groups.length, 3)}">
+          ${m.groups.map((g) => `
+            <div class="card p-2">
+              <p class="px-3 pb-1 pt-2 text-2xs font-medium uppercase tracking-[0.08em] text-slate-400">${g.name}</p>
+              ${g.items.map(([ic, t, d, href, as]) => `
+                <a href="${href}" ${as ? `data-as="${as}"` : ''} class="group flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-slate-50 focus-visible:bg-slate-50">
+                  <span class="mt-0.5 text-slate-400 group-hover:text-brand-blue">${icon(ic, 'w-4 h-4')}</span>
+                  <span class="min-w-0"><span class="block text-sm font-semibold text-slate-900">${t}</span><span class="block text-sm text-slate-600">${d}</span></span>
+                  <span class="ml-auto mt-0.5 text-slate-300 group-hover:text-slate-500">${icon('chevronRight', 'w-4 h-4')}</span>
+                </a>`).join('')}
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+
+    $('roles').innerHTML = ROLES.map(([k, task, dash]) => `
+      <tr>
+        <td class="whitespace-nowrap">${roleChip(k)}</td>
+        <td class="text-sm text-slate-700">${task}</td>
+        <td class="text-sm text-slate-600">${dash}</td>
+        <td class="text-right">${open(k === 'sa' ? 'super-admin/dashboard.html' : 'finance/dashboard.html', k, 'Lihat dashboard')}</td>
+      </tr>`).join('');
+
+    function renderFlow(id) {
+      const f = FLOWS.find((x) => x.id === id) || FLOWS[0];
+      document.querySelectorAll('.flow-tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.flow === f.id)));
+      $('flow-panel').setAttribute('aria-labelledby', `tab-${f.id}`);
+      $('flow-panel').innerHTML = `
+        <div class="card">
+          <div class="border-b border-slate-200 px-5 py-4">
+            <p class="text-sm text-slate-600">${f.lead}</p>
+            <ol class="mt-4 flex flex-wrap items-center gap-y-2 text-xs" aria-label="Ringkasan alur">
+              ${f.steps.map((s, i) => `<li class="flex items-center"><span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700"><span class="num text-slate-400">${i + 1}</span>${s.title}</span>${i < f.steps.length - 1 ? `<span class="mx-1 text-slate-300">${icon('chevronRight', 'w-3.5 h-3.5')}</span>` : ''}</li>`).join('')}
+            </ol>
+          </div>
+          <ol class="space-y-3 px-5 py-5">
+            ${f.steps.map((s, i) => `
+              <li class="step-line relative flex gap-4 pb-3">
+                <span class="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-700 num">${i + 1}</span>
+                <div class="min-w-0 flex-1 pt-1">
+                  <div class="flex flex-wrap items-center gap-2"><h3 class="text-sm font-semibold text-slate-900">${s.title}</h3>${roleChip(s.who)}</div>
+                  <p class="mt-1 max-w-3xl text-sm leading-relaxed text-slate-600">${s.body}</p>
+                  ${s.try ? `<p class="mt-2 flex max-w-3xl items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><span class="mt-0.5">${icon('info', 'w-4 h-4')}</span><span><b class="font-semibold">Coba:</b> ${s.try}</span></p>` : ''}
+                  ${s.open ? `<div class="mt-3">${open(s.open[0], s.open[1], s.open[2])}</div>` : ''}
+                </div>
+              </li>`).join('')}
+          </ol>
+        </div>`;
+    }
+    $('flow-tabs').innerHTML = FLOWS.map((f, i) => `<button type="button" role="tab" id="tab-${f.id}" data-flow="${f.id}" class="flow-tab shrink-0 whitespace-nowrap rounded-lg border border-transparent px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"><span class="num mr-1.5 text-slate-400">${i + 1}</span>${f.title}</button>`).join('');
+    $('flow-tabs').addEventListener('click', (e) => { const b = e.target.closest('.flow-tab'); if (b) renderFlow(b.dataset.flow); });
+    $('flow-tabs').addEventListener('keydown', (e) => {
+      if (!['ArrowRight', 'ArrowLeft'].includes(e.key)) return;
+      const tabs = [...document.querySelectorAll('.flow-tab')];
+      const i = tabs.findIndex((t) => t.getAttribute('aria-selected') === 'true');
+      const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+      renderFlow(next.dataset.flow); next.focus();
+    });
+    renderFlow(FLOWS[0].id);
+
+    $('lifecycles').innerHTML = LIFECYCLES.map(([name, main, side]) => `
+      <div>
+        <p class="text-xs font-medium text-slate-500">${name}</p>
+        <div class="mt-2 flex flex-wrap items-center gap-1.5">${main.map((s, i) => `${badge(s)}${i < main.length - 1 ? `<span class="text-slate-300">${icon('chevronRight', 'w-3.5 h-3.5')}</span>` : ''}`).join('')}
+        ${side.length ? `<span class="ml-2 text-xs text-slate-400">cabang:</span>${side.map((s) => badge(s)).join('')}` : ''}</div>
+      </div>`).join('');
+    $('rules').innerHTML = RULES.map(([ic, t]) => `<li class="flex gap-2.5 text-slate-700"><span class="mt-0.5 text-slate-400">${icon(ic, 'w-4 h-4')}</span>${t}</li>`).join('');
+    $('sla').innerHTML = SLA.map(([t, v]) => `<div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"><span class="text-slate-700">${t}</span><span class="num font-semibold text-slate-900">${v}</span></div>`).join('');
+
+    // "Lihat sebagai" mengikuti role langkah yang dibuka.
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a[data-as]');
+      if (a) UI.store.set('etrama.viewAs', a.dataset.as);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Detail Piutang · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div id="banners" class="space-y-3"></div>
+    <section class="card">
+      <div class="card-body flex flex-wrap items-start justify-between gap-4">
+        <div><div class="flex flex-wrap items-center gap-2"><h2 id="h-no" class="font-mono text-lg font-semibold"></h2><span id="h-badges" class="flex flex-wrap gap-1.5"></span></div><p id="h-sub" class="mt-1 text-sm text-slate-600"></p></div>
+        <div id="actions" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div id="stats" class="grid gap-px border-t border-slate-200 bg-slate-200 sm:grid-cols-4"></div>
+    </section>
+    <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section class="card" aria-labelledby="tl-title"><div class="card-head"><h2 id="tl-title" class="card-title">Riwayat penagihan & catatan</h2><span class="text-xs text-slate-500">Urut terbaru</span></div><div id="timeline" class="card-body"></div></section>
+      <div class="space-y-5">
+        <section class="card" aria-labelledby="pay-title"><div class="card-head"><h2 id="pay-title" class="card-title">Pembayaran</h2></div><div id="pays"></div></section>
+        <section class="card" aria-labelledby="rem-title"><div class="card-head"><h2 id="rem-title" class="card-title">Status reminder</h2></div><ul id="rems" class="divide-y divide-slate-100 text-sm"></ul></section>
+      </div>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'piutang', title: 'Detail Piutang', breadcrumb: ['Finance', 'Piutang', 'Detail'], perm: 'piutang' });
+    const { esc, formatRupiah: rp, icon } = UI;
+    const $ = (id) => document.getElementById(id);
+    const no = new URLSearchParams(location.search).get('no') || 'INV/ETR/2026/09/0021';
+    const isStaf = Layout.can('piutang', 'buat');
+    const canVerify = Layout.can('piutangVerify', 'verifikasi');
+    const canDecide = Layout.can('piutangDecide', 'putuskan');
+
+    const upd = (fn) => DB.update('invoices', (i) => i.no === no, (i) => { i.ar = i.ar || { payments: [], reminders: [], notes: [] }; ['payments', 'reminders', 'notes'].forEach((k) => { i.ar[k] = i.ar[k] || []; }); fn(i.ar, i); });
+    const note = (ar, text) => ar.notes.push({ at: Cal.nowIso(), by: ctx.user.id, text });
+
+    function render() {
+      const raw = DB.invoice(no);
+      if (!raw || raw.status !== 'Terkirim') { $('page-content').innerHTML = `<div class="card">${UI.emptyState({ icon: 'coins', title: 'Piutang tidak ditemukan', description: 'Hanya invoice berstatus Terkirim yang masuk laporan piutang.', action: { label: 'Kembali ke laporan piutang', href: 'piutang.html' } })}</div>`; return; }
+      const x = Calc.receivables().find((r) => r.no === no);
+      const ar = x.ar;
+      const st = x.arStatus;
+      document.title = `Piutang ${x.label} · ETrama Finance`;
+
+      // Hitung eskalasi H+30 hari kerja dari pemberitahuan terakhir (dijeda saat On Hold)
+      const notice = ar.lastNotice || (x.overdue > 0 ? x.due : null);
+      const esc30 = notice && !['Paid', 'On Hold', 'Dieskalasi'].includes(st) ? Cal.slaRemaining(notice, 'eskalasi') : null;
+
+      const b = [];
+      if (st === 'On Hold') b.push(['border-amber-300 bg-amber-50 text-amber-900', 'pause', `<b>On Hold</b> sejak ${UI.formatDate(ar.hold.at)} — ${esc(ar.hold.note)} Reminder jatuh tempo dan hitungan eskalasi H+30 dijeda.`]);
+      if (st === 'Dieskalasi') b.push(['border-orange-300 bg-orange-50 text-orange-900', 'arrowUp', `<b>Dieskalasi ke Manager & Direksi</b> pada ${UI.formatDateTime(ar.escalated.at)}. ${ar.decision ? `Keputusan: <b>${esc(ar.decision.choice)}</b> (${esc(DB.user(ar.decision.by).name)}).` : 'Menunggu keputusan Lead F&A bersama Direksi.'}`]);
+      const rd = Calc.reminderDue(x);
+      if (rd) b.push(['border-blue-200 bg-blue-50 text-blue-900', 'bell', `<b>Reminder ${rd}</b> hari ini: konfirmasi jadwal pembayaran ke klien sebelum jatuh tempo ${UI.formatDate(x.due)}.`]);
+      $('banners').innerHTML = b.map(([c, ic, h]) => `<div class="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${c}">${icon(ic, 'w-4 h-4 mt-0.5')}<p>${h}</p></div>`).join('');
+
+      $('h-no').textContent = x.label;
+      $('h-badges').innerHTML = UI.badge(st) + (x.outstanding ? ` <span class="text-xs text-slate-500 self-center">${esc(x.bucket)}</span>` : '') + ((ar.payments || []).length ? (ar.checked ? UI.badge('Sudah dicek') : UI.badge('Belum dicek')) : '');
+      $('h-sub').innerHTML = `<b class="text-slate-900">${esc(x.clientName)}</b> · u.p. ${esc(x.client.pic)} · ${View.invLink(x.no, 'Lihat invoice')} · ${View.soLink(x.soNo)}`;
+      $('stats').innerHTML = [
+        ['Nilai invoice', rp(x.total)], ['Dibayar', `<span class="text-emerald-700">${rp(x.paid)}</span>`], ['Sisa piutang', `<span class="${x.overdue && x.outstanding ? 'text-red-700' : ''}">${rp(x.outstanding)}</span>`],
+        ['Jatuh tempo', `${UI.formatDate(x.due)} <span class="text-xs font-normal text-slate-500">${x.outstanding ? (x.overdue ? `· lewat ${x.overdue} hari` : `· ${Cal.daysBetween(MOCK.today, x.due)} hari lagi`) : ''}</span>`],
+      ].map(([k, v]) => `<div class="bg-white px-5 py-3"><p class="text-xs text-slate-500">${k}</p><p class="mt-0.5 text-base font-semibold num">${v}</p></div>`).join('')
+        + (esc30 ? `<div class="bg-white px-5 py-3 sm:col-span-4 text-sm text-slate-600">${icon('arrowUp', 'inline w-4 h-4 -mt-0.5 mr-1 text-orange-600')}Eskalasi otomatis ke Manager pada <b class="num">${UI.formatDate(esc30.deadline)}</b> (H+30 hari kerja dari pemberitahuan terakhir ${UI.formatDate(notice)}) · ${UI.slaBadge(esc30.remaining)}</div>` : '');
+
+      /* Aksi */
+      const a = [];
+      if (isStaf && st !== 'Paid') {
+        a.push(`<button type="button" class="btn btn-primary" id="a-pay">${icon('coins')}Catat pembayaran</button>`);
+        if (st !== 'On Hold') a.push(`<button type="button" class="btn btn-secondary" id="a-rem">${icon('bell')}${x.overdue ? 'Catat pemberitahuan ulang' : 'Catat reminder'}</button>`);
+        a.push(st === 'On Hold' ? `<button type="button" class="btn btn-secondary" id="a-unhold">Aktifkan penagihan</button>` : `<button type="button" class="btn btn-secondary" id="a-hold">${icon('pause')}On Hold</button>`);
+      }
+      if (isStaf) a.push(`<button type="button" class="btn btn-ghost" id="a-note">+ Catatan</button>`);
+      if (canVerify && (ar.payments || []).length && !ar.checked) a.push(`<button type="button" class="btn btn-success" id="a-check">${icon('checkCheck')}Tandai sudah dicek</button>`);
+      if (canDecide && st === 'Dieskalasi' && !ar.decision) a.push(`<button type="button" class="btn btn-navy" id="a-decide">Catat keputusan</button>`);
+      $('actions').innerHTML = a.join('');
+      bind(x);
+
+      /* Timeline */
+      const items = [
+        ...(ar.notes || []).map((n) => ({ at: n.at, title: 'Catatan', by: View.userName(n.by), note: n.text, tone: /hold/i.test(n.text) ? 'yellow' : /eskalasi/i.test(n.text) ? 'orange' : 'gray' })),
+        ...(ar.reminders || []).map((r) => ({ at: r.at, title: `${r.type === 'Ulang' ? 'Pemberitahuan ulang' : 'Reminder ' + r.type} · via ${r.channel}`, by: View.userName(r.by), note: r.note, tone: 'yellow' })),
+        ...(ar.payments || []).map((p) => ({ at: p.at, title: `Pembayaran diterima ${rp(p.amount === 'FULL' ? x.total : p.amount)}`, by: View.userName(p.by), note: `Tanggal bayar ${UI.formatDate(p.date)} · bukti ${p.proof}`, tone: 'green' })),
+        ...(ar.decision ? [{ at: ar.decision.at, title: `Keputusan: ${ar.decision.choice}`, by: View.userName(ar.decision.by), note: ar.decision.note, tone: 'orange' }] : []),
+        ...(ar.checked ? [{ at: ar.checked.at, title: 'Laporan piutang sudah dicek Lead F&A', by: View.userName(ar.checked.by), tone: 'green' }] : []),
+        { at: x.sentAt || x.history.filter((h) => /Terkirim/.test(h.action)).slice(-1)[0].at, title: 'Invoice terkirim — masuk laporan piutang', by: x.creator.name, tone: 'blue' },
+      ].sort((p, q) => q.at.localeCompare(p.at));
+      $('timeline').innerHTML = View.timeline(items);
+
+      $('pays').innerHTML = (ar.payments || []).length ? `<table class="tbl tbl-compact"><thead><tr><th>Tanggal</th><th class="!text-right">Nominal</th><th>Bukti</th></tr></thead><tbody>${ar.payments.map((p) => { const late = Cal.workdaysBetween(p.infoDate, Cal.dateOf(p.at)) > Cal.slaDays('catatBayar'); return `<tr><td class="num">${UI.formatDate(p.date)}${late ? `<p>${UI.badge('Dicatat > H+1', { tone: 'red', icon: 'alert' })}</p>` : ''}</td><td class="r font-medium">${rp(p.amount === 'FULL' ? x.total : p.amount)}</td><td>${View.fileChip(p.proof)}</td></tr>`; }).join('')}</tbody></table>` : UI.emptyState({ icon: 'coins', title: 'Belum ada pembayaran' });
+      const done = new Set((ar.reminders || []).map((r) => r.type));
+      $('rems').innerHTML = DB.settings().reminders.slice().sort((p, q) => q - p).map((d) => {
+        const date = Cal.addDays(x.due, -d);
+        const s = done.has(`H-${d}`) ? UI.badge('Sudah', { tone: 'green', icon: 'check' }) : st === 'On Hold' ? UI.badge('Dijeda', { tone: 'yellow', icon: 'pause' }) : date > MOCK.today ? UI.badge('Terjadwal', { tone: 'gray', icon: 'clock' }) : x.outstanding ? UI.badge('Terlewat', { tone: 'red', icon: 'alert' }) : UI.badge('—', { tone: 'gray' });
+        return `<li class="flex items-center justify-between gap-3 px-5 py-2.5"><span>H-${d} <span class="text-xs text-slate-500 num">· ${UI.formatDate(date)}</span></span>${s}</li>`;
+      }).join('');
+    }
+
+    function bind(x) {
+      const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', fn); };
+      on('a-pay', () => {
+        let dz;
+        UI.formModal({
+          title: 'Catat pembayaran dari klien', description: `Sisa piutang ${rp(x.outstanding)}. Jurnal penerimaan tetap dibuat di sistem jurnal ETrama.`,
+          body: `<div class="grid gap-5 sm:grid-cols-2">
+            <div data-field><label class="label" for="p-info">Tanggal info pembayaran <span class="req">*</span></label><input id="p-info" type="date" class="input" required value="${MOCK.today}"><p class="hint">SLA catat H+1 dari tanggal ini.</p></div>
+            <div data-field><label class="label" for="p-date">Tanggal bayar <span class="req">*</span></label><input id="p-date" type="date" class="input" required value="${MOCK.today}"></div>
+            <div data-field class="sm:col-span-2"><label class="label" for="p-amt">Nominal diterima (Rp) <span class="req">*</span></label><input id="p-amt" inputmode="numeric" class="input num" required value="${UI.formatNumber(x.outstanding)}"><p class="hint" id="p-hint"></p></div></div><div id="p-dz"></div>`,
+          submitText: 'Simpan pembayaran',
+          onOpen(w) {
+            dz = UI.dropzone(w.querySelector('#p-dz'), { label: 'Bukti transfer', required: true, accept: ['pdf', 'jpg', 'jpeg', 'png'] });
+            const amt = w.querySelector('#p-amt'); const hint = w.querySelector('#p-hint');
+            const sync = () => { const v = Number(amt.value.replace(/\D/g, '')) || 0; hint.textContent = v >= x.outstanding ? 'Pembayaran penuh → status Paid.' : v > 0 ? `Pembayaran sebagian → status Partially Paid, sisa ${rp(x.outstanding - v)}.` : ''; };
+            amt.addEventListener('input', sync); amt.addEventListener('blur', () => { amt.value = UI.formatNumber(Number(amt.value.replace(/\D/g, '')) || 0); }); sync();
+          },
+          onSubmit(f) {
+            if (!UI.validateRequired(f)) return false;
+            const amt = f.querySelector('#p-amt'); const v = Number(amt.value.replace(/\D/g, '')) || 0;
+            if (!v) { UI.fieldError(amt, 'Nominal wajib lebih dari 0'); return false; }
+            if (v > x.outstanding) { UI.fieldError(amt, `Melebihi sisa piutang ${rp(x.outstanding)}`); return false; }
+            if (!dz.files().length) { dz.error('Bukti transfer wajib di-upload.'); return false; }
+            const info = f.querySelector('#p-info').value;
+            const late = Cal.workdaysBetween(info, MOCK.today) > Cal.slaDays('catatBayar');
+            const before = x.arStatus;
+            upd((ar) => { ar.payments.push({ date: f.querySelector('#p-date').value, infoDate: info, amount: v, proof: dz.files()[0].name, by: ctx.user.id, at: Cal.nowIso() }); ar.checked = null; if (v >= x.outstanding) { ar.hold = null; } });
+            const after = Calc.arStatus(Calc.inv(DB.invoice(no)));
+            DB.log({ action: 'Mencatat pembayaran', docNo: x.label, module: 'Piutang', reason: late ? 'Dicatat melewati SLA H+1' : '', changes: [{ field: 'Status penagihan', before, after }, { field: 'Dibayar', before: rp(x.paid), after: rp(x.paid + v) }] });
+            DB.notify({ type: 'review', roles: ['lead'], title: 'Pembaruan laporan piutang perlu dicek', docNo: x.no, href: `finance/piutang-detail.html?no=${x.no}` });
+            UI.toast(`Pembayaran ${rp(v)} tercatat. Status: ${after}.${late ? ' Dicatat melewati SLA H+1.' : ''}`, { type: late ? 'warning' : 'success' });
+            render(); return true;
+          },
+        });
+      });
+      on('a-rem', () => {
+        const overdue = x.overdue > 0;
+        const due = Calc.reminderDue(x);
+        UI.formModal({
+          title: overdue ? 'Catat pemberitahuan ulang' : 'Catat hasil reminder', description: overdue ? 'Pemberitahuan ulang mereset hitungan eskalasi H+30 hari kerja.' : 'Konfirmasi jadwal pembayaran ke klien.',
+          body: `<div class="grid gap-5 sm:grid-cols-2">
+            ${overdue ? '' : `<div data-field><label class="label" for="r-type">Jenis <span class="req">*</span></label><select id="r-type" class="input" required>${DB.settings().reminders.map((d) => `<option ${due === `H-${d}` ? 'selected' : ''}>H-${d}</option>`).join('')}<option>Lainnya</option></select></div>`}
+            <div data-field><label class="label" for="r-date">Tanggal <span class="req">*</span></label><input id="r-date" type="date" class="input" required value="${MOCK.today}"></div>
+            <div data-field><label class="label" for="r-ch">Kanal <span class="req">*</span></label><select id="r-ch" class="input" required><option>Telepon</option><option>Email</option><option>WhatsApp</option></select></div>
+            <div data-field class="sm:col-span-2"><label class="label" for="r-note">Catatan hasil konfirmasi <span class="req">*</span></label><textarea id="r-note" rows="3" class="input" required placeholder="mis. klien konfirmasi transfer 09/11"></textarea></div></div>`,
+          submitText: 'Simpan',
+          onSubmit(f) {
+            if (!UI.validateRequired(f)) return false;
+            const type = overdue ? 'Ulang' : f.querySelector('#r-type').value;
+            const d = f.querySelector('#r-date').value;
+            upd((ar) => { ar.reminders.push({ at: `${d}T${Cal.nowIso().slice(11)}`, type, channel: f.querySelector('#r-ch').value, note: f.querySelector('#r-note').value.trim(), by: ctx.user.id }); if (overdue) ar.lastNotice = d; });
+            DB.log({ action: overdue ? 'Mencatat pemberitahuan ulang' : `Mencatat reminder ${type}`, docNo: x.label, module: 'Piutang', reason: f.querySelector('#r-note').value.trim() });
+            UI.toast(overdue ? 'Pemberitahuan ulang tercatat. Hitungan eskalasi H+30 dimulai ulang.' : `Reminder ${type} tercatat.`);
+            render(); return true;
+          },
+        });
+      });
+      on('a-hold', async () => {
+        const r = await UI.confirm({ title: 'Ubah status ke On Hold?', message: 'Reminder jatuh tempo dan hitungan eskalasi H+30 dijeda selama On Hold.', confirmText: 'Set On Hold', tone: 'warning', note: { required: true, label: 'Catatan keterangan', placeholder: 'mis. klien meminta penundaan / menunggu dokumen tambahan' } });
+        if (!r.confirmed) return;
+        upd((ar) => { ar.hold = { at: Cal.nowIso(), by: ctx.user.id, note: r.note }; note(ar, `Status diubah ke On Hold: ${r.note}`); });
+        DB.log({ action: 'Mengubah status piutang', docNo: x.label, module: 'Piutang', reason: r.note, changes: [{ field: 'Status penagihan', before: x.arStatus, after: 'On Hold' }] });
+        UI.toast('Piutang di-set On Hold.', { type: 'warning' }); render();
+      });
+      on('a-unhold', async () => {
+        const r = await UI.confirm({ title: 'Kembalikan ke penagihan aktif?', message: 'Reminder dan hitungan eskalasi berjalan kembali.', confirmText: 'Aktifkan', note: { required: true, label: 'Catatan', placeholder: 'mis. renovasi selesai, klien siap bayar' } });
+        if (!r.confirmed) return;
+        upd((ar) => { ar.hold = null; ar.lastNotice = MOCK.today; note(ar, `Penagihan diaktifkan kembali: ${r.note}`); });
+        const after = Calc.arStatus(Calc.inv(DB.invoice(no)));
+        DB.log({ action: 'Mengubah status piutang', docNo: x.label, module: 'Piutang', reason: r.note, changes: [{ field: 'Status penagihan', before: 'On Hold', after }] });
+        UI.toast(`Penagihan aktif kembali (${after}).`); render();
+      });
+      on('a-note', async () => {
+        const r = await UI.confirm({ title: 'Tambah catatan', message: 'Catatan tampil berurutan lengkap dengan nama dan waktu.', confirmText: 'Simpan', note: { required: true, label: 'Catatan', placeholder: 'Tulis catatan penagihan' } });
+        if (!r.confirmed) return;
+        upd((ar) => note(ar, r.note)); DB.log({ action: 'Menambah catatan piutang', docNo: x.label, module: 'Piutang', reason: r.note });
+        UI.toast('Catatan ditambahkan.'); render();
+      });
+      on('a-check', () => {
+        upd((ar) => { ar.checked = { at: Cal.nowIso(), by: ctx.user.id }; });
+        DB.log({ action: 'Verifikasi laporan piutang', docNo: x.label, module: 'Piutang' });
+        UI.toast('Laporan piutang ditandai sudah dicek.'); render();
+      });
+      on('a-decide', () => {
+        UI.formModal({
+          title: 'Keputusan atas piutang bermasalah', description: 'Diputuskan Lead Finance & Accounting bersama Direksi (SOP III.2).',
+          body: `<fieldset><legend class="label">Tindakan <span class="req">*</span></legend><div class="mt-2 space-y-2">${['Koordinasi internal', 'Surat teguran', 'Pemberhentian pekerjaan proyek sementara'].map((c, i) => `<label class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><input type="radio" name="dec" value="${c}" ${i === 0 ? 'checked' : ''} class="h-4 w-4 text-brand-blue">${c}</label>`).join('')}</div></fieldset>
+            <div data-field><label class="label" for="d-note">Catatan keputusan <span class="req">*</span></label><textarea id="d-note" rows="3" class="input" required></textarea></div>`,
+          submitText: 'Simpan keputusan', tone: 'navy',
+          onSubmit(f) {
+            if (!UI.validateRequired(f)) return false;
+            const choice = f.querySelector('[name="dec"]:checked').value;
+            upd((ar) => { ar.decision = { at: Cal.nowIso(), by: ctx.user.id, choice, note: f.querySelector('#d-note').value.trim() }; });
+            DB.log({ action: 'Mencatat keputusan piutang bermasalah', docNo: x.label, module: 'Piutang', reason: f.querySelector('#d-note').value.trim(), changes: [{ field: 'Keputusan', before: '—', after: choice }] });
+            DB.notify({ type: 'eskalasi', roles: ['staf', 'mgr_ops'], title: `Keputusan piutang: ${choice}`, docNo: x.no, href: `finance/piutang-detail.html?no=${x.no}` });
+            UI.toast(`Keputusan "${choice}" dicatat.`); render(); return true;
+          },
+        });
+      });
+    }
+    render();
+  </script>
+</body>
+</html>

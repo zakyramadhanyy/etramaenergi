@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SLA, Reminder & Hari Libur · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div class="flex flex-wrap items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3 text-sm text-blue-900">
+      <span class="mt-0.5 text-brand-blue" data-icon="clock"></span>
+      <p class="flex-1">SLA dihitung dalam <b>hari kerja (Senin–Jumat, di luar hari libur di bawah)</b> atau <b>hari kalender</b>, sesuai satuan tiap proses. Langkah yang melewati SLA ditandai merah dan memicu notifikasi ke pelaku serta atasannya.</p>
+    </div>
+    <section class="card" aria-labelledby="sla-title">
+      <div class="card-head"><div><h2 id="sla-title" class="card-title">Nilai SLA per langkah</h2><p class="mt-0.5 text-xs text-slate-500">Default mengikuti SOP 01.001-00</p></div>
+        <div class="flex gap-2"><button type="button" class="btn btn-secondary btn-sm" id="sla-default">Kembalikan default SOP</button><button type="button" class="btn btn-primary btn-sm" id="sla-save" disabled>Simpan SLA</button></div></div>
+      <div class="overflow-x-auto"><table class="tbl"><thead><tr><th>Langkah</th><th>Pelaku</th><th class="!text-right">Durasi</th><th>Satuan</th><th>Dihitung</th></tr></thead><tbody id="sla"></tbody></table></div>
+    </section>
+    <div class="grid gap-5 xl:grid-cols-2">
+      <section class="card self-start" aria-labelledby="rem-title">
+        <div class="card-head"><h2 id="rem-title" class="card-title">Jadwal reminder jatuh tempo</h2><button type="button" class="btn btn-primary btn-sm" id="rem-save" disabled>Simpan</button></div>
+        <div class="card-body space-y-4">
+          <p class="text-sm text-slate-600">Sistem membuat tugas reminder untuk Staf Finance pada hari-hari berikut sebelum jatuh tempo. Selama piutang <b>On Hold</b>, reminder dijeda.</p>
+          <ul id="rem" class="flex flex-wrap gap-2"></ul>
+          <form id="rem-form" class="flex items-end gap-2" novalidate>
+            <div><label class="label" for="rem-new">Tambah reminder (H-)</label><input id="rem-new" type="number" min="1" max="60" class="input w-32 num" placeholder="mis. 3"></div>
+            <button class="btn btn-secondary" type="submit">Tambah</button>
+          </form>
+        </div>
+      </section>
+      <section class="card" aria-labelledby="hol-title">
+        <div class="card-head"><h2 id="hol-title" class="card-title">Daftar hari libur</h2><span class="text-xs text-slate-500" id="hol-count"></span></div>
+        <form id="hol-form" class="flex flex-wrap items-end gap-3 border-b border-slate-100 px-5 py-4" novalidate>
+          <div data-field><label class="label" for="hol-date">Tanggal <span class="req">*</span></label><input id="hol-date" type="date" class="input" required></div>
+          <div data-field class="min-w-[200px] flex-1"><label class="label" for="hol-name">Keterangan <span class="req">*</span></label><input id="hol-name" class="input" required placeholder="mis. Cuti bersama"></div>
+          <button class="btn btn-primary" type="submit">Tambah tanggal</button>
+        </form>
+        <ul id="hol" class="max-h-[380px] divide-y divide-slate-100 overflow-y-auto"></ul>
+      </section>
+    </div>
+    <section class="card" aria-labelledby="calc-title">
+      <div class="card-head"><h2 id="calc-title" class="card-title">Cek perhitungan hari kerja</h2></div>
+      <div class="card-body flex flex-wrap items-end gap-4">
+        <div><label class="label" for="c-start">Tanggal mulai</label><input id="c-start" type="date" class="input" value="2026-12-21"></div>
+        <div><label class="label" for="c-days">SLA (H+)</label><input id="c-days" type="number" min="0" class="input w-28 num" value="3"></div>
+        <p class="pb-2 text-sm text-slate-700" id="c-out" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'super-admin', active: 'sla-reminder', title: 'SLA, Reminder & Hari Libur', breadcrumb: ['Super Admin', 'Approval & SLA', 'SLA & Hari Libur'] });
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.dataset.icon); });
+    const { esc } = UI;
+    let sla = JSON.parse(JSON.stringify(DB.settings().sla));
+    let rem = DB.settings().reminders.slice();
+
+    function renderSla() {
+      const saved = DB.settings().sla;
+      document.getElementById('sla').innerHTML = sla.map((s, i) => `<tr>
+        <td class="font-medium text-slate-900">${esc(s.step)}</td><td>${esc(s.actor)}</td>
+        <td class="r"><label class="sr-only" for="sla-${i}">SLA ${esc(s.step)} (${esc(s.actor)})</label><span class="inline-flex items-center gap-1"><span class="text-slate-500">H+</span><input id="sla-${i}" data-i="${i}" type="number" min="0" max="90" value="${s.days}" class="input input-sm w-20 text-right num ${saved[i].days !== s.days ? 'warn' : ''}"></span></td>
+        <td><label class="sr-only" for="unit-${i}">Satuan SLA ${esc(s.step)}</label><select id="unit-${i}" data-unit="${i}" class="input input-sm w-36 ${(saved[i].unit || 'kerja') !== (s.unit || 'kerja') ? 'warn' : ''}"><option value="kerja" ${(s.unit || 'kerja') === 'kerja' ? 'selected' : ''}>Hari kerja</option><option value="kalender" ${s.unit === 'kalender' ? 'selected' : ''}>Hari kalender</option></select></td>
+        <td class="text-slate-500">${esc(s.basis)}</td></tr>`).join('');
+      document.querySelectorAll('#sla [data-unit]').forEach((el) => el.addEventListener('change', () => { sla[el.dataset.unit].unit = el.value; renderSla(); }));
+      document.querySelectorAll('#sla input').forEach((el) => el.addEventListener('input', () => { sla[el.dataset.i].days = Math.max(0, Number(el.value) || 0); el.classList.toggle('warn', saved[el.dataset.i].days !== sla[el.dataset.i].days); document.getElementById('sla-save').disabled = JSON.stringify(sla) === JSON.stringify(DB.settings().sla); }));
+      document.getElementById('sla-save').disabled = JSON.stringify(sla) === JSON.stringify(saved);
+    }
+    document.getElementById('sla-default').addEventListener('click', () => { sla = JSON.parse(JSON.stringify(MOCK.settings.sla)); renderSla(); });
+    document.getElementById('sla-save').addEventListener('click', async () => {
+      const saved = DB.settings().sla;
+      const u = (x) => ((x.unit || 'kerja') === 'kerja' ? 'hari kerja' : 'hari kalender');
+      const changes = sla.filter((s, i) => s.days !== saved[i].days || (s.unit || 'kerja') !== (saved[i].unit || 'kerja')).map((s) => { const o = saved.find((x) => x.key === s.key); return { field: `${s.step} (${s.actor})`, before: `H+${o.days} ${u(o)}`, after: `H+${s.days} ${u(s)}` }; });
+      const r = await UI.confirm({ title: 'Simpan nilai SLA?', message: `${changes.length} nilai SLA berubah. Berlaku untuk langkah yang dimulai setelah disimpan.`, confirmText: 'Simpan', note: { required: false, label: 'Alasan', placeholder: 'Opsional' } });
+      if (!r.confirmed) return;
+      const s = DB.settings(); s.sla = JSON.parse(JSON.stringify(sla)); DB.saveSettings(s);
+      DB.log({ action: 'Mengubah nilai SLA', docNo: 'SLA', module: 'Approval & SLA', reason: r.note, changes });
+      UI.toast('Nilai SLA disimpan.'); renderSla();
+    });
+
+    function renderRem() {
+      rem.sort((a, b) => b - a);
+      document.getElementById('rem').innerHTML = rem.map((d) => `<li class="inline-flex items-center gap-1 rounded-lg bg-brand-soft py-1 pl-3 pr-1 text-sm font-semibold text-brand-navy num">H-${d}<button type="button" data-rm="${d}" class="btn btn-ghost btn-sm btn-icon !h-6 !w-6" aria-label="Hapus reminder H-${d}" ${rem.length === 1 ? 'disabled' : ''}>${UI.icon('x', 'w-3.5 h-3.5')}</button></li>`).join('');
+      document.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { rem = rem.filter((x) => x !== Number(b.dataset.rm)); renderRem(); }));
+      document.getElementById('rem-save').disabled = rem.join() === DB.settings().reminders.slice().sort((a, b) => b - a).join();
+    }
+    document.getElementById('rem-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const el = document.getElementById('rem-new'); const v = Number(el.value);
+      if (!v || v < 1) { UI.fieldError(el, 'Isi angka 1–60'); return; }
+      if (rem.includes(v)) { UI.fieldError(el, `H-${v} sudah ada`); return; }
+      UI.fieldError(el, ''); rem.push(v); el.value = ''; renderRem();
+    });
+    document.getElementById('rem-save').addEventListener('click', () => {
+      const s = DB.settings(); const before = s.reminders.map((d) => `H-${d}`).join(', ');
+      s.reminders = rem.slice(); DB.saveSettings(s);
+      DB.log({ action: 'Mengubah jadwal reminder', docNo: 'Reminder', module: 'Approval & SLA', changes: [{ field: 'Jadwal reminder', before, after: rem.map((d) => `H-${d}`).join(', ') }] });
+      UI.toast('Jadwal reminder disimpan.'); renderRem();
+    });
+
+    function renderHol() {
+      const list = DB.settings().holidays.slice().sort((a, b) => a.date.localeCompare(b.date));
+      document.getElementById('hol-count').textContent = `${list.length} tanggal`;
+      const dayName = (d) => new Intl.DateTimeFormat('id-ID', { weekday: 'long', timeZone: 'UTC' }).format(new Date(d + 'T00:00:00Z'));
+      document.getElementById('hol').innerHTML = list.map((h) => `<li class="flex items-center gap-4 px-5 py-2.5 ${h.date < MOCK.today ? 'opacity-60' : ''}">
+        <span class="w-24 text-sm font-semibold text-slate-900 num">${UI.formatDate(h.date)}</span><span class="w-16 text-xs text-slate-500">${dayName(h.date)}</span>
+        <span class="flex-1 text-sm text-slate-700">${esc(h.name)}</span>
+        <button type="button" class="btn btn-ghost btn-sm text-red-600" data-del="${h.date}" aria-label="Hapus ${UI.formatDate(h.date)}">Hapus</button></li>`).join('') || `<li>${UI.emptyState({ icon: 'clock', title: 'Belum ada hari libur' })}</li>`;
+      document.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+        const h = list.find((x) => x.date === b.dataset.del);
+        const r = await UI.confirm({ title: `Hapus ${UI.formatDate(h.date)}?`, message: `"${h.name}" akan dihitung sebagai hari kerja.`, confirmText: 'Hapus', tone: 'danger' });
+        if (!r.confirmed) return;
+        const s = DB.settings(); s.holidays = s.holidays.filter((x) => x.date !== h.date); DB.saveSettings(s);
+        DB.log({ action: 'Menghapus hari libur', docNo: UI.formatDate(h.date), module: 'Approval & SLA', changes: [{ field: 'Hari libur', before: `${UI.formatDate(h.date)} ${h.name}`, after: '—' }] });
+        UI.toast('Hari libur dihapus.'); renderHol(); calc();
+      }));
+    }
+    document.getElementById('hol-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      if (!UI.validateRequired(form)) return;
+      const date = form.querySelector('#hol-date'); const name = form.querySelector('#hol-name').value.trim();
+      const s = DB.settings();
+      if (s.holidays.some((h) => h.date === date.value)) { UI.fieldError(date, 'Tanggal sudah ada di daftar'); return; }
+      const w = new Date(date.value + 'T00:00:00Z').getUTCDay();
+      s.holidays.push({ date: date.value, name }); DB.saveSettings(s);
+      DB.log({ action: 'Menambah hari libur', docNo: UI.formatDate(date.value), module: 'Approval & SLA', changes: [{ field: 'Hari libur', before: '—', after: `${UI.formatDate(date.value)} ${name}` }] });
+      UI.toast(w === 0 || w === 6 ? 'Ditambahkan. Catatan: tanggal ini jatuh pada akhir pekan.' : 'Hari libur ditambahkan.', { type: w === 0 || w === 6 ? 'warning' : 'success' });
+      form.reset(); renderHol(); calc();
+    });
+
+    function calc() {
+      const start = document.getElementById('c-start').value; const n = Number(document.getElementById('c-days').value) || 0;
+      if (!start) return;
+      const end = Cal.addWorkdays(start, n);
+      const skipped = Cal.daysBetween(start, end) - n;
+      document.getElementById('c-out').innerHTML = `Batas SLA: <b class="num">${UI.formatDate(end)}</b> <span class="text-slate-500">(${skipped} hari non-kerja dilewati)</span>`;
+    }
+    ['c-start', 'c-days'].forEach((id) => document.getElementById(id).addEventListener('input', calc));
+    renderSla(); renderRem(); renderHol(); calc();
+  </script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-canvas font-sans text-slate-900">
+  <!-- Dashboard Super Admin: ringkasan konfigurasi & aktivitas sistem (mengikuti mockup). -->
+  <main id="page-content" class="space-y-6">
+    <div id="kpi" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4"></div>
+    <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <section class="card" aria-labelledby="act-title">
+        <div class="card-head !items-start"><div><h2 id="act-title" class="card-title">Aktivitas sistem</h2><p class="card-sub" id="act-range"></p></div><div class="text-right"><p id="act-total" class="text-3xl font-extrabold leading-none text-slate-900 num"></p><p class="mt-1 text-sm text-slate-500">total aktivitas</p></div></div>
+        <div class="card-body"><div class="relative h-60"><canvas id="act-chart" role="img" aria-label="Grafik jumlah aktivitas sistem per hari, 7 hari terakhir"></canvas></div></div>
+      </section>
+      <section class="card" aria-labelledby="att-title">
+        <div class="card-head"><h2 id="att-title" class="card-title">Perlu perhatian</h2><span id="att-count"></span></div>
+        <ul id="att" class="card-body space-y-3"></ul>
+      </section>
+    </div>
+    <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <section class="card overflow-hidden" aria-labelledby="log-title">
+        <div class="card-head"><div><h2 id="log-title" class="card-title">Aktivitas terbaru</h2><p class="card-sub">Hari ini · <span class="num">02/11/2026</span></p></div><a href="log-history.html" class="btn btn-secondary">Buka log history</a></div>
+        <div class="overflow-x-auto"><table class="tbl min-w-[640px]"><thead><tr><th>Waktu</th><th>Pengguna</th><th>Aktivitas</th><th>Modul</th></tr></thead><tbody id="log"></tbody></table></div>
+      </section>
+      <section class="card self-start" aria-labelledby="cfg-title">
+        <div class="card-head"><h2 id="cfg-title" class="card-title">Konfigurasi aktif</h2><a href="approval-setting.html" class="btn btn-secondary btn-sm">Ubah</a></div>
+        <dl id="cfg" class="divide-y divide-line px-6 pb-3"></dl>
+      </section>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({
+        portal: 'super-admin', active: 'dashboard', title: 'Dashboard', breadcrumb: ['Super Admin', 'Dashboard'], greeting: true,
+      actions: `<span class="tip" data-tip="Terakhir sinkron: 02/11/2026 08:30 WIB" id="sync-tip"><button type="button" id="sync-btn" class="btn btn-secondary !h-11">${UI.icon('refresh', 'w-4 h-4')}<span>Sync</span></button></span><a href="log-history.html" class="btn btn-secondary !h-11">${UI.icon('history')}Log history</a><a href="user-management.html" class="btn btn-primary !h-11">${UI.icon('users')}Kelola user</a>`,
+    });
+    const { esc, icon } = UI;
+    // Sync: simulasi menyegarkan data dari server (prototipe: memuat ulang data lokal).
+    document.getElementById('sync-btn').addEventListener('click', (e) => {
+      const b = e.currentTarget; if (b.disabled) return;
+      b.disabled = true; b.querySelector('svg').classList.add('animate-spin'); b.querySelector('span').textContent = 'Menyinkronkan…';
+      setTimeout(() => {
+        const t = UI.formatTime(new Date());
+        document.getElementById('sync-tip').dataset.tip = `Terakhir sinkron: ${UI.formatDate(new Date())} ${t}`;
+        b.disabled = false; b.querySelector('svg').classList.remove('animate-spin'); b.querySelector('span').textContent = 'Sync';
+        UI.toast(`Data dashboard diperbarui pukul ${t}.`, { title: 'Sinkronisasi selesai' });
+      }, 900);
+    });
+    const $ = (id) => document.getElementById(id);
+
+    /* ---------- KPI: aktif vs total ---------- */
+    const stat = (label, coll, href, extra) => {
+      const all = DB.all(coll); const on = all.filter((x) => x.status === 'Aktif').length; const off = all.length - on;
+      const pct = all.length ? Math.round((on / all.length) * 100) : 0;
+      return `<section class="card p-6">
+        <div class="flex items-center justify-between gap-3"><h3 class="text-sm font-medium text-slate-600">${label}</h3><a href="${Layout.url(href)}" class="kpi-link btn btn-secondary btn-sm">Detail</a></div>
+        <div class="mt-4 flex items-center gap-3"><p class="text-4xl font-extrabold leading-none text-slate-900 num">${on}</p><span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 num">${pct}% aktif</span></div>
+        <div class="mt-5 h-2 overflow-hidden rounded-full bg-slate-100" role="img" aria-label="${pct}% aktif"><span class="block h-full rounded-full bg-brand-blue" style="width:${pct}%"></span></div>
+        <p class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600"><span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-brand-blue"></span>${on} aktif</span><span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-slate-400"></span>${off} nonaktif</span><span>dari ${all.length} total${extra || ''}</span></p>
+      </section>`;
+    };
+    $('kpi').innerHTML = [
+      stat('Client aktif', 'clients', 'super-admin/master-client.html'),
+      stat('Vendor aktif', 'vendors', 'super-admin/master-vendor.html'),
+      stat('Staf BD aktif', 'stafBD', 'super-admin/master-staf-bd.html'),
+      stat('User aktif', 'users', 'super-admin/user-management.html', ` · ${DB.all('rolesList').length} role`),
+    ].join('');
+
+    /* ---------- Aktivitas sistem 7 hari (log + kejadian dokumen) ---------- */
+    const events = [];
+    DB.all('logs').forEach((l) => events.push(l.at));
+    DB.all('invoices').forEach((i) => (i.history || []).forEach((h) => events.push(h.at)));
+    DB.all('salesOrders').forEach((so) => events.push(so.createdAt));
+    DB.all('bast').forEach((b) => events.push(b.at));
+    DB.all('vendorPayments').forEach((p) => events.push(p.at));
+    DB.all('users').forEach((u) => u.lastLogin && events.push(u.lastLogin));
+    const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const HARI_L = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const days = Array.from({ length: 7 }, (_, i) => Cal.addDays(MOCK.today, i - 6));
+    const dObj = (d) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd); };
+    const counts = days.map((d) => events.filter((e) => String(e).slice(0, 10) === d).length);
+    const fd = (d) => { const x = dObj(d); return `${x.getDate()} ${BLN[x.getMonth()]}`; };
+    $('act-range').textContent = `7 hari terakhir · ${fd(days[0])} – ${fd(days[6])} ${dObj(days[6]).getFullYear()}`;
+    $('act-total').textContent = counts.reduce((a, b) => a + b, 0);
+    if (window.Chart) {
+      const ctx2 = $('act-chart').getContext('2d');
+      const grad = ctx2.createLinearGradient(0, 0, 0, 240); grad.addColorStop(0, 'rgba(41,49,115,.22)'); grad.addColorStop(1, 'rgba(41,49,115,0)');
+      new Chart(ctx2, {
+        type: 'line',
+        data: { labels: days.map((d) => `${HARI[dObj(d).getDay()]} ${dObj(d).getDate()}`), datasets: [{ data: counts, borderColor: '#293173', backgroundColor: grad, fill: true, tension: 0.1, borderWidth: 2.5, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: '#fff', pointBorderColor: '#293173', pointBorderWidth: 2 }] },
+        options: {
+          maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0F172A', padding: 10, cornerRadius: 10, displayColors: false, titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: '500' }, bodyFont: { family: 'Plus Jakarta Sans', size: 14, weight: '700' },
+            callbacks: { title: (c) => { const d = dObj(days[c[0].dataIndex]); return `${HARI_L[d.getDay()]}, ${d.getDate()} ${BLN[d.getMonth()]}`; }, label: (c) => `${c.raw} aktivitas` } } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0, font: { family: 'Plus Jakarta Sans', size: 12 }, color: '#64748B' }, grid: { color: '#EEF1F5', borderDash: [4, 4] }, border: { display: false } },
+            x: { ticks: { font: { family: 'Plus Jakarta Sans', size: 12 }, color: '#64748B' }, grid: { display: false }, border: { color: '#E5E9F0' } } },
+        },
+      });
+    }
+
+    /* ---------- Perlu perhatian ---------- */
+    const users = DB.all('users');
+    const att = [];
+    const pending = users.filter((u) => u.mustChangePassword && !Auth.overrides()[u.id] && u.status === 'Aktif');
+    if (pending.length) att.push({ tone: 'blue', ic: 'key', title: `${pending.length} user belum login pertama`, sub: pending.map((u) => u.name).join(', '), link: ['Lihat user', 'user-management.html'] });
+    const noSup = users.filter((u) => ['staf', 'lead', 'mgr_ops'].includes(u.role) && u.status === 'Aktif' && !u.supervisorId);
+    if (noSup.length) att.push({ tone: 'red', ic: 'network', title: `${noSup.length} user tanpa atasan langsung`, sub: 'Reviewer & approver tidak dapat ditentukan.', link: ['Atur hierarki', 'hierarki-role.html'] });
+    const usedInactive = DB.all('clients').filter((c) => c.status === 'Nonaktif' && DB.all('salesOrders').some((s) => s.clientCode === c.code && s.status === 'Aktif'));
+    if (usedInactive.length) att.push({ tone: 'amber', ic: 'alert', title: `${usedInactive.length} client nonaktif masih punya SO aktif`, sub: usedInactive.map((c) => c.name).join(', '), link: ['Tinjau client', 'master-client.html'] });
+    if (!Flow.config().threshold.enabled) att.push({ tone: 'blue', ic: 'info', title: 'Threshold nominal invoice nonaktif', sub: 'Invoice bernilai besar tidak diteruskan ke Direktur.', link: ['Buka approval', 'approval-setting.html'] });
+    const T = {
+      blue: ['border-line bg-white', 'bg-blue-50 text-brand-blue', 'text-brand-blue'],
+      amber: ['border-amber-200 bg-[#FFFBEB]', 'bg-amber-100 text-amber-600', 'text-amber-700'],
+      red: ['border-red-200 bg-red-50/60', 'bg-red-100 text-red-600', 'text-red-700'],
+    };
+    $('att-count').innerHTML = att.length ? `<span class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-600 num">${att.length} item</span>` : '';
+    $('att').innerHTML = att.length ? att.map((a) => `<li class="flex gap-4 rounded-2xl border p-5 ${T[a.tone][0]}">
+        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl ${T[a.tone][1]}">${icon(a.ic, 'w-5 h-5')}</span>
+        <div class="min-w-0"><p class="text-sm font-bold text-slate-900">${esc(a.title)}</p><p class="mt-1 text-sm text-slate-600">${esc(a.sub)}</p><a href="${a.link[1]}" class="mt-3 inline-flex items-center gap-1 text-sm font-bold ${T[a.tone][2]} hover:underline">${esc(a.link[0])} ${icon('arrowRight', 'w-4 h-4')}</a></div>
+      </li>`).join('')
+      : `<li>${UI.emptyState({ icon: 'checkCircle', title: 'Semua konfigurasi lengkap' })}</li>`;
+
+    /* ---------- Aktivitas terbaru (hari ini) ---------- */
+    const MOD = { 'Akun': 'gray', 'Invoice': 'blue', 'Approval': 'blue', 'Sales Order': 'orange', 'BAST': 'green', 'Master Data': 'violet', 'User Management': 'violet', 'Role Management': 'violet', 'Purchase Order': 'teal', 'Pembayaran Vendor': 'teal', 'Piutang': 'amber' };
+    const PILL = { gray: 'bg-slate-100 text-slate-700', blue: 'bg-blue-50 text-blue-700', orange: 'bg-orange-50 text-orange-700', green: 'bg-emerald-50 text-emerald-700', violet: 'bg-violet-50 text-violet-700', teal: 'bg-teal-50 text-teal-700', amber: 'bg-amber-50 text-amber-700' };
+    const DOT = { gray: 'bg-slate-400', blue: 'bg-blue-600', orange: 'bg-orange-500', green: 'bg-emerald-500', violet: 'bg-violet-500', teal: 'bg-teal-500', amber: 'bg-amber-500' };
+    const AV = ['bg-blue-100 text-blue-700', 'bg-pink-100 text-pink-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-violet-100 text-violet-700', 'bg-sky-100 text-sky-700'];
+    const avTone = (id) => AV[(parseInt(String(id).replace(/\D/g, ''), 10) || 0) % AV.length];
+    const ini = (n) => n.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const today = DB.all('logs').filter((l) => String(l.at).startsWith(MOCK.today)).sort((a, b) => b.at.localeCompare(a.at));
+    const recent = (today.length ? today : DB.all('logs').slice().sort((a, b) => b.at.localeCompare(a.at))).slice(0, 8);
+    $('log').innerHTML = recent.map((l) => {
+      const u = DB.user(l.userId) || { name: 'Sistem', id: '0' }; const m = MOD[l.module] || 'gray';
+      return `<tr>
+        <td class="whitespace-nowrap"><span class="font-bold text-slate-900 num">${UI.formatTime(l.at).replace(' WIB', '')}</span> <span class="text-xs text-slate-500">WIB</span></td>
+        <td><div class="flex items-center gap-3"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${avTone(u.id)}">${esc(ini(u.name))}</span><span class="t-main !font-medium">${esc(u.name)}</span></div></td>
+        <td><p class="t-main !font-medium">${esc(l.action)}</p>${l.docNo && l.docNo !== '—' ? `<p class="t-doc">${esc(l.docNo)}</p>` : ''}</td>
+        <td><span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${PILL[m]}"><span class="h-1.5 w-1.5 rounded-full ${DOT[m]}"></span>${esc(l.module)}</span></td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="4">${UI.emptyState({ icon: 'history', title: 'Belum ada aktivitas hari ini' })}</td></tr>`;
+
+    /* ---------- Konfigurasi aktif ---------- */
+    const inv = Flow.config(); const thr = inv.threshold;
+    const chip = (t) => `<span class="rounded-lg bg-brand-soft px-2.5 py-1 text-sm font-bold text-brand-blue">${esc(t)}</span>`;
+    const arrow = `<span class="text-slate-400">${icon('arrowRight', 'w-4 h-4')}</span>`;
+    const LV = { lead: 'Lead F&A', mgr_ops: 'Manager', direktur: 'Direktur' };
+    const bank = DB.settings().banks.find((x) => x.isDefault);
+    const autoSkip = inv.layers.some((l) => (l.skipIfEqual != null ? l.skipIfEqual : DB.settings().approval.autoSkip));
+    const rows = [
+      ['Approval invoice', `<div class="mt-2 flex flex-wrap items-center gap-2">${inv.layers.filter((l) => l.active).map((l) => chip(LV[l.key] || l.label)).join(arrow) || '—'}</div>`, true],
+      ['Budget threshold', thr.enabled ? `<div class="mt-2 flex flex-wrap items-center gap-2">${thr.tiers.filter((t) => t.active !== false).map((t) => `<span class="text-sm font-bold text-slate-900 num">≥ ${UI.formatRupiah(t.min)}</span>${arrow}${chip('Direktur')}`).join('')}</div>` : '<p class="mt-1 text-sm font-semibold text-slate-500">Nonaktif</p>', true],
+      ['Skip otomatis', `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${autoSkip ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}"><span class="h-1.5 w-1.5 rounded-full ${autoSkip ? 'bg-emerald-500' : 'bg-slate-400'}"></span>${autoSkip ? 'Aktif' : 'Nonaktif'}</span>`],
+      ['Tarif PPN', `<span class="text-base font-extrabold text-slate-900 num">${DB.settings().ppnRate}%</span>`],
+      ['Rekening default', bank ? `<p class="mt-1 text-sm font-bold text-slate-900">${esc(bank.bank)}</p><p class="font-mono text-sm text-slate-600">${esc(bank.account)}</p>` : '—', true],
+    ];
+    $('cfg').innerHTML = rows.map(([k, v, stack]) => stack
+      ? `<div class="py-4"><dt class="text-sm text-slate-500">${k}</dt><dd>${v}</dd></div>`
+      : `<div class="flex items-center justify-between gap-4 py-4"><dt class="text-sm text-slate-500">${k}</dt><dd>${v}</dd></div>`).join('');
+  </script>
+</body>
+</html>

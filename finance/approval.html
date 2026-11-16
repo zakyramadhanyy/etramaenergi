@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Approval · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div id="intro" class="flex flex-wrap items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3 text-sm text-blue-900"></div>
+    <section class="card" data-tabs>
+      <div role="tablist" aria-label="Approval" class="flex gap-6 border-b border-slate-200 px-5">
+        <button role="tab" id="t1" aria-controls="p1" aria-selected="true" class="-mb-px border-b-2 py-3 text-sm font-semibold">Menunggu persetujuan <span id="c1" class="ml-1 rounded-md bg-slate-100 px-1.5 text-xs num"></span></button>
+        <button role="tab" id="t2" aria-controls="p2" aria-selected="false" class="-mb-px border-b-2 py-3 text-sm font-semibold">Riwayat approval</button>
+      </div>
+      <div id="p1" role="tabpanel" aria-labelledby="t1"></div>
+      <div id="p2" role="tabpanel" aria-labelledby="t2" class="p-4" hidden><div id="hist"></div></div>
+    </section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'approval', title: 'Approval', breadcrumb: ['Finance', 'Approval'], perm: 'approval' });
+    if (ctx.allowed) main();
+    function main() {
+    const { esc, formatRupiah: rp, icon } = UI;
+    const $ = (id) => document.getElementById(id);
+    const status = Flow.myReviewStatus(ctx.user.role);
+    const LAYER = { lead: 'Layer 1 — Lead Finance & Accounting', mgr_ops: 'Layer 2 — Manager', direktur: 'Direktur — invoice di atas budget threshold' };
+    $('intro').innerHTML = `${icon('badgeCheck', 'w-4 h-4 mt-0.5')}<p class="flex-1">Anda me-review sebagai <b>${LAYER[ctx.user.role] || '—'}</b>. SLA review H+1 hari kerja. Pengembalian wajib disertai catatan dan diinformasikan di hari yang sama (H+0). Anda tidak dapat meng-approve dokumen yang Anda buat sendiri.</p>`;
+
+    function queue() {
+      const list = DB.all('invoices').filter((i) => i.status === status).map(Calc.inv).map((x) => Object.assign(x, { sla: Calc.invoiceSla(x), submittedAt: x.history.slice(-1)[0].at }));
+      list.sort((a, b) => a.sla.remaining - b.sla.remaining);
+      $('c1').textContent = list.length;
+      $('p1').innerHTML = list.length ? `<div class="overflow-x-auto"><table class="tbl"><thead><tr><th>Invoice</th><th>Client · termin</th><th class="!text-right">Total</th><th>Diterima</th><th>Sisa SLA</th><th class="!text-right">Aksi</th></tr></thead><tbody>
+        ${list.map((x) => `<tr id="row-${esc(x.no).replace(/\//g, '-')}">
+          <td>${View.invLink(x.no, x.label)}<p class="text-xs text-slate-500">Dibuat ${esc(x.creator.name)}${Flow.isOwn(x, ctx.user) ? ' <b class="text-amber-700">(Anda)</b>' : ''}</p></td>
+          <td><p class="font-medium text-slate-900">${esc(x.client.name)}</p><p class="text-xs text-slate-500">Termin ${x.term.no} ${esc(x.term.label)} · ${x.term.pct}%</p></td>
+          <td class="r font-semibold text-slate-900">${rp(x.total)}${x.status === 'Review Direktur' ? `<p class="text-xs font-normal text-slate-500">> threshold</p>` : ''}</td>
+          <td class="num">${UI.formatDateTime(x.submittedAt)}</td>
+          <td>${UI.slaBadge(x.sla.remaining)}</td>
+          <td><div class="flex justify-end gap-1.5"><button type="button" class="btn btn-ghost btn-sm" data-open="${esc(x.no)}">Detail</button>${View.reviewButtons(x, ctx.user, 'sm')}</div></td></tr>`).join('')}
+        </tbody></table></div>` : UI.emptyState({ icon: 'checkCircle', title: 'Tidak ada dokumen yang menunggu persetujuan Anda', description: 'Dokumen baru akan muncul di sini dan Anda mendapat notifikasi di ikon lonceng.' });
+      View.bindReview($('p1'), refresh);
+      $('p1').querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => openDrawer(b.dataset.open)));
+    }
+
+    function openDrawer(no) {
+      const x = Calc.inv(DB.invoice(no));
+      const bast = x.basis ? DB.find('bast', (q) => q.id === x.basis) : null;
+      const route = Flow.route(x);
+      const d = UI.drawer({
+        title: x.label, subtitle: `${UI.badge(x.status)} ${UI.slaBadge(Calc.invoiceSla(x).remaining)}`,
+        body: `<dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <div><dt class="text-xs text-slate-500">Client</dt><dd class="font-medium">${esc(x.client.name)}</dd></div><div><dt class="text-xs text-slate-500">PIC</dt><dd>${esc(x.client.pic)}</dd></div>
+            <div><dt class="text-xs text-slate-500">Sales Order</dt><dd>${View.soLink(x.soNo)}</dd></div><div><dt class="text-xs text-slate-500">No. dokumen klien</dt><dd class="font-mono text-xs">${esc(x.so.clientDocNo)}</dd></div>
+            <div><dt class="text-xs text-slate-500">Termin</dt><dd>${x.term.no}. ${esc(x.term.label)} (${x.term.pct}%)</dd></div><div><dt class="text-xs text-slate-500">Pemicu</dt><dd>${esc(x.term.triggerText)}</dd></div>
+            <div><dt class="text-xs text-slate-500">Tanggal · jatuh tempo</dt><dd class="num">${UI.formatDate(x.date)} · ${UI.formatDate(x.due)}</dd></div><div><dt class="text-xs text-slate-500">Rekening</dt><dd>${esc((DB.bank(x.bankId) || {}).bank || '—')} ${esc((DB.bank(x.bankId) || {}).account || '')}</dd></div>
+          </dl>
+          <dl class="mt-5 space-y-1.5 rounded-lg bg-slate-50 p-4 text-sm num"><div class="flex justify-between"><dt class="text-slate-500">DPP</dt><dd>${rp(x.dpp)}</dd></div><div class="flex justify-between"><dt class="text-slate-500">PPN</dt><dd>${rp(x.ppn)}</dd></div><div class="flex justify-between border-t border-slate-200 pt-1.5 font-semibold"><dt>Total</dt><dd>${rp(x.total)}</dd></div></dl>
+          <h3 class="mt-5 text-sm font-semibold text-slate-900">Lampiran</h3>
+          <div class="mt-2 flex flex-wrap gap-2">${x.so.files.map(View.fileChip).join('')}${bast ? View.fileChip(bast.file) : ''}</div>
+          <h3 class="mt-5 text-sm font-semibold text-slate-900">Alur approval</h3>
+          <div class="mt-2">${View.stepper(['Draft', ...route, 'Disetujui'], x.status)}</div>
+          <h3 class="mt-5 text-sm font-semibold text-slate-900">Riwayat</h3>
+          <div class="mt-3">${View.timeline(x.history.slice().reverse().slice(0, 5).map((h) => ({ at: h.at, title: h.action, by: DB.user(h.by).name, note: h.note, tone: View.toneOf(h.action) })))}</div>`,
+        footer: `<a href="invoice-detail.html?no=${encodeURIComponent(x.no)}" class="btn btn-ghost mr-auto">Buka preview PDF</a>${View.reviewButtons(x, ctx.user)}`,
+        onOpen(el) { View.bindReview(el, () => { d.close(); refresh(); }); },
+      });
+    }
+
+    function history() {
+      const rows = DB.all('invoices').flatMap((i) => i.history.filter((h) => /^Disetujui|^Dikembalikan/.test(h.action)).map((h) => {
+        const x = Calc.inv(i);
+        return { no: i.no, label: x.label, clientName: x.client.name, total: x.total, at: h.at, action: h.action, note: h.note, by: DB.user(h.by).name, byId: h.by, result: h.action.startsWith('Dikembalikan') ? 'Dikembalikan' : 'Disetujui' };
+      })).sort((a, b) => b.at.localeCompare(a.at));
+      new UI.DataTable($('hist'), {
+        data: rows, pageSize: 10, searchPlaceholder: 'Cari invoice, client, reviewer…', searchKeys: ['no', 'clientName', 'by', 'note'],
+        filters: [{ key: 'result', label: 'Hasil', options: ['Disetujui', 'Dikembalikan'] }, { key: 'by', label: 'Reviewer', options: [...new Set(rows.map((r) => r.by))] }],
+        columns: [
+          { key: 'at', label: 'Waktu', sortable: true, render: (r) => `<span class="num">${UI.formatDateTime(r.at)}</span>` },
+          { key: 'no', label: 'Invoice', render: (r) => `${View.invLink(r.no, r.label)}<p class="text-xs text-slate-500">${esc(r.clientName)}</p>` },
+          { key: 'total', label: 'Total', align: 'right', numeric: true, render: (r) => rp(r.total) },
+          { key: 'by', label: 'Reviewer', render: (r) => `${esc(r.by)}${r.byId === ctx.user.id ? ' <span class="text-xs text-slate-500">(Anda)</span>' : ''}<p class="text-xs text-slate-500">${esc(r.action)}</p>` },
+          { key: 'result', label: 'Hasil', className: '!whitespace-normal min-w-[200px]', render: (r) => UI.badge(r.result) + (r.note ? `<p class="mt-1 text-xs text-slate-600">${esc(r.note)}</p>` : '') },
+        ],
+      });
+    }
+    function refresh() { queue(); history(); }
+    refresh();
+    const pre = new URLSearchParams(location.search).get('no');
+    if (pre && DB.invoice(pre) && DB.invoice(pre).status === status) openDrawer(pre);
+    }
+  </script>
+</body>
+</html>

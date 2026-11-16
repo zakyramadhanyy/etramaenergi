@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Management · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div class="flex flex-wrap items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3 text-sm text-blue-900">
+      <span class="mt-0.5 text-brand-blue" data-icon="mail"></span>
+      <p class="flex-1">Akun baru dikirim ke email user beserta <b>password sementara</b>. User wajib mengganti password saat login pertama. User nonaktif tidak bisa login.</p>
+    </div>
+    <div id="kpi" class="grid gap-5 sm:grid-cols-3"></div>
+    <div id="table"></div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'super-admin', active: 'user-management', title: 'User Management', breadcrumb: ['Super Admin', 'User Management'] });
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.dataset.icon); });
+    const { esc } = UI;
+    const RANK = { staf: 1, lead: 2, mgr_ops: 3, direktur: 4, super_admin: 0 };
+    const jabatan = (u) => (MOCK.roles[u.role] ? MOCK.roles[u.role].label : '—');
+    const roleName = (id) => (DB.find('rolesList', (r) => r.id === id) || { name: '—' }).name;
+
+    function kpis() {
+      const us = DB.all('users');
+      document.getElementById('kpi').innerHTML = [
+        View.kpi('Total user', us.length, `${us.filter((u) => u.status === 'Aktif').length} aktif`, { icon: 'users' }),
+        View.kpi('Menunggu login pertama', us.filter((u) => u.mustChangePassword && !Auth.overrides()[u.id]).length, 'Password sementara belum diganti', { icon: 'key' }),
+        View.kpi('User nonaktif', us.filter((u) => u.status === 'Nonaktif').length, 'Tidak bisa login', { icon: 'lock' }),
+      ].join('');
+    }
+    const rows = () => DB.all('users').map((u) => Object.assign({}, u, {
+      jabatan: jabatan(u), level: MOCK.roles[u.role] ? MOCK.roles[u.role].level : '—', roleName: roleName(u.roleId), atasan: u.supervisorId ? DB.user(u.supervisorId).name : '—',
+    }));
+
+    const table = new UI.DataTable(document.getElementById('table'), {
+      data: rows(), pageSize: 10, searchPlaceholder: 'Cari nama atau email…', searchKeys: ['name', 'email', 'jabatan'],
+      filters: [{ key: 'roleName', label: 'Role', options: DB.all('rolesList').map((r) => r.name) }, { key: 'level', label: 'Level', options: ['Staff', 'Lead', 'Manager', 'Direktur'] }, { key: 'status', label: 'Status', options: ['Aktif', 'Nonaktif'] }],
+      actions: `<button type="button" class="btn btn-primary" id="add">${UI.icon('plus')}Tambah user</button>`,
+      columns: [
+        { key: 'name', label: 'User', sortable: true, render: (u) => `<div class="flex items-center gap-3"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-navy">${esc(u.name.split(' ').slice(0, 2).map((w) => w[0]).join(''))}</span><div><p class="font-medium text-slate-900">${esc(u.name)}${u.id === ctx.user.id ? ' <span class="text-xs font-normal text-slate-500">(Anda)</span>' : ''}</p><p class="text-xs text-slate-500">${esc(u.email)}</p></div></div>` },
+        { key: 'roleName', label: 'Role', sortable: true },
+        { key: 'level', label: 'Level hierarki', sortable: true, render: (u) => (u.role === 'super_admin' ? '<span class="text-slate-400">—</span>' : `<span class="inline-flex items-center gap-1.5"><span class="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-2xs text-slate-500">${MOCK.roles[u.role].rank}</span>${esc(u.level)}</span>`) },
+        { key: 'atasan', label: 'Atasan langsung', sortable: true },
+        { key: 'status', label: 'Status', render: (u) => `<div class="flex flex-col items-start gap-1">${UI.badge(u.status)}${u.mustChangePassword && !Auth.overrides()[u.id] ? UI.badge('Password sementara', { tone: 'yellow', icon: 'key' }) : ''}</div>` },
+        { key: 'lastLogin', label: 'Login terakhir', sortable: true, render: (u) => (u.lastLogin ? `<span class="num">${UI.formatDateTime(u.lastLogin)}</span><p class="text-xs text-slate-500">${u.sessions || 0} sesi aktif</p>` : '<span class="text-slate-400">Belum pernah</span>') },
+        {
+          key: 'aksi', label: 'Aksi', align: 'right', render: (u) => {
+            const self = u.id === ctx.user.id;
+            return `<div class="flex items-center justify-end gap-1">
+              <button type="button" class="btn btn-secondary btn-sm" data-act="edit" data-id="${u.id}">${UI.icon('pencil', 'w-3.5 h-3.5')}Edit</button>
+              ${UI.menuButton([
+                u.status === 'Nonaktif' ? { label: 'Reset password', icon: 'key', disabled: true, reason: 'User nonaktif' } : { label: 'Reset password', icon: 'key', attrs: `data-act="reset" data-id="${u.id}"` },
+                (u.sessions || 0) && !self ? { label: `Paksa logout (${u.sessions} sesi)`, icon: 'logout', attrs: `data-act="logout" data-id="${u.id}"` } : { label: 'Paksa logout', icon: 'logout', disabled: true, reason: self ? 'Tidak dapat untuk akun sendiri' : 'Tidak ada sesi aktif' },
+                self ? { label: 'Nonaktifkan', icon: 'lock', disabled: true, reason: 'Anda tidak dapat menonaktifkan akun sendiri.' } : { label: u.status === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan', icon: 'lock', danger: u.status === 'Aktif', attrs: `data-act="toggle" data-id="${u.id}"` },
+              ], `Aksi lain untuk ${u.name}`)}
+            </div>`;
+          },
+        },
+      ],
+      onRender(root) { root.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => ACTIONS[b.dataset.act](b.dataset.id))); },
+    });
+    document.getElementById('add').addEventListener('click', () => openForm(null));
+    const refresh = () => { table.setData(rows()); kpis(); };
+    kpis();
+
+    function supervisorOptions(roleKey, current, selfId) {
+      const r = RANK[roleKey] || 0;
+      return '<option value="">— Tidak ada —</option>' + DB.all('users')
+        .filter((u) => u.id !== selfId && u.status === 'Aktif' && u.role !== 'super_admin' && RANK[u.role] > r)
+        .map((u) => `<option value="${u.id}" ${u.id === current ? 'selected' : ''}>${esc(u.name)} — ${esc(jabatan(u))}</option>`).join('');
+    }
+
+    function openForm(id) {
+      const u = id ? DB.find('users', (x) => x.id === id) : null;
+      const roles = DB.all('rolesList');
+      UI.formModal({
+        title: u ? `Edit user — ${u.name}` : 'Tambah user', size: 'lg',
+        description: u ? 'Perubahan role, level, dan atasan berlaku pada login berikutnya dan tercatat di log history.' : 'Password sementara dikirim otomatis ke email user.',
+        body: `<div class="grid gap-5 sm:grid-cols-2">
+          <div data-field class="sm:col-span-2"><label class="label" for="u-name">Nama lengkap <span class="req">*</span></label><input id="u-name" class="input" required value="${esc(u ? u.name : '')}"></div>
+          <div data-field class="sm:col-span-2"><label class="label" for="u-email">Email <span class="req">*</span></label><input id="u-email" type="email" class="input" required value="${esc(u ? u.email : '')}" placeholder="nama@etrama.co.id"><p class="hint">Harus unik. Dipakai untuk login.</p></div>
+          <div data-field><label class="label" for="u-role">Role akses <span class="req">*</span></label><select id="u-role" class="input" required>${roles.map((r) => `<option value="${r.id}" ${(u ? u.roleId : 'R-02') === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div>
+          <div data-field id="jab-wrap"><label class="label" for="u-jab">Level hierarki <span class="req">*</span></label><select id="u-jab" class="input" required>${MOCK.financeRoleOrder.map((k) => `<option value="${k}" ${(u ? u.role : 'staf') === k ? 'selected' : ''}>${MOCK.roles[k].level} (rank ${MOCK.roles[k].rank})</option>`).join('')}</select><p class="hint">Khusus role Admin Finance — menentukan wewenang submit / review / approve.</p></div>
+          <div data-field class="sm:col-span-2" id="sup-wrap"><label class="label" for="u-sup">Atasan langsung</label><select id="u-sup" class="input"></select><p class="hint">Dipakai sistem untuk menentukan reviewer & approver. Hanya user dengan level lebih tinggi.</p></div>
+        </div>`,
+        submitText: u ? 'Simpan perubahan' : 'Tambah & kirim email',
+        onOpen(wrap) {
+          const roleSel = wrap.querySelector('#u-role'); const jab = wrap.querySelector('#u-jab'); const sup = wrap.querySelector('#u-sup');
+          const sync = () => {
+            const isSA = roleSel.value === 'R-01';
+            wrap.querySelector('#jab-wrap').classList.toggle('hidden', isSA);
+            wrap.querySelector('#sup-wrap').classList.toggle('hidden', isSA);
+            jab.required = !isSA;
+            sup.innerHTML = supervisorOptions(jab.value, u ? u.supervisorId : (jab.value === 'staf' ? 'U-004' : null), u && u.id);
+          };
+          roleSel.addEventListener('change', sync); jab.addEventListener('change', sync); sync();
+        },
+        onSubmit(form) {
+          if (!UI.validateRequired(form)) return false;
+          const email = form.querySelector('#u-email');
+          const v = email.value.trim().toLowerCase();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { UI.fieldError(email, 'Format email tidak valid'); email.focus(); return false; }
+          if (DB.find('users', (x) => x.email.toLowerCase() === v && x.id !== id)) { UI.fieldError(email, 'Email sudah dipakai user lain'); email.focus(); return false; }
+          const roleId = form.querySelector('#u-role').value;
+          const role = roleId === 'R-01' ? 'super_admin' : form.querySelector('#u-jab').value;
+          const sup = roleId === 'R-01' ? null : (form.querySelector('#u-sup').value || null);
+          const name = form.querySelector('#u-name').value.trim();
+          if (!u) {
+            const nums = DB.all('users').map((x) => parseInt(x.id.slice(2), 10));
+            const temp = 'Etr#' + Math.random().toString(36).slice(2, 7) + '7';
+            const nu = { id: 'U-' + String(Math.max(...nums) + 1).padStart(3, '0'), name, email: v, role, roleId, supervisorId: sup, status: 'Aktif', mustChangePassword: true, tempPassword: temp, lastLogin: null, sessions: 0 };
+            DB.insert('users', nu);
+            DB.log({ action: 'Menambah user', docNo: v, module: 'User Management', changes: [{ field: 'Role', before: '—', after: `${roleName(roleId)} · ${jabatan(nu)}` }] });
+            refresh();
+            setTimeout(() => showTempPassword(nu, 'Akun dibuat'), 50);
+          } else {
+            const changes = [];
+            if (u.name !== name) changes.push({ field: 'Nama', before: u.name, after: name });
+            if (u.email !== v) changes.push({ field: 'Email', before: u.email, after: v });
+            if (u.roleId !== roleId) changes.push({ field: 'Role', before: roleName(u.roleId), after: roleName(roleId) });
+            if (u.role !== role) changes.push({ field: 'Level hierarki', before: jabatan(u), after: MOCK.roles[role].label });
+            if ((u.supervisorId || null) !== sup) changes.push({ field: 'Atasan langsung', before: u.supervisorId ? DB.user(u.supervisorId).name : '—', after: sup ? DB.user(sup).name : '—' });
+            if (!changes.length) { UI.toast('Tidak ada perubahan.', { type: 'info' }); return true; }
+            DB.update('users', (x) => x.id === id, (x) => Object.assign(x, { name, email: v, roleId, role, supervisorId: sup }));
+            DB.log({ action: 'Mengubah user', docNo: v, module: 'User Management', changes });
+            UI.toast('Perubahan user disimpan. Berlaku pada login berikutnya.');
+            refresh();
+          }
+          return true;
+        },
+      });
+    }
+
+    function showTempPassword(u, title) {
+      UI.formModal({
+        title, submitText: '', cancelText: 'Tutup',
+        onOpen(w) { w.querySelector('[data-copy-temp]').addEventListener('click', () => UI.copyText(u.tempPassword, 'Password sementara')); },
+        body: `<p class="text-sm text-slate-600">Email berisi akun dan password sementara telah dikirim ke <b class="text-slate-900">${esc(u.email)}</b>.</p>
+          <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm"><p class="text-xs font-medium uppercase tracking-wide text-slate-500">Simulasi isi email</p><p class="mt-2">Email: <span class="font-mono">${esc(u.email)}</span></p><div class="mt-1 flex items-center gap-2"><span>Password sementara:</span><code class="rounded-md bg-white px-2 py-1 font-mono font-semibold ring-1 ring-slate-200">${esc(u.tempPassword)}</code><button type="button" class="btn btn-secondary btn-sm" data-copy-temp>${UI.icon('clipboard', 'w-3.5 h-3.5')}Salin</button></div><p class="mt-2 text-xs text-slate-500">User akan diminta mengganti password saat login pertama.</p></div>`,
+      });
+    }
+
+    const ACTIONS = {
+      edit: (id) => openForm(id),
+      async reset(id) {
+        const u = DB.find('users', (x) => x.id === id);
+        const r = await UI.confirm({ title: `Reset password ${u.name}?`, message: 'Password lama tidak berlaku lagi. Password sementara baru dikirim ke email user dan semua sesi aktif user dikeluarkan.', confirmText: 'Reset password', tone: 'warning' });
+        if (!r.confirmed) return;
+        const temp = 'Etr#' + Math.random().toString(36).slice(2, 7) + '7';
+        DB.update('users', (x) => x.id === id, (x) => { x.mustChangePassword = true; x.tempPassword = temp; x.sessions = 0; });
+        const o = Auth.overrides(); delete o[id]; UI.store.set(Auth.keys.pw, o);
+        DB.log({ action: 'Reset password user', docNo: u.email, module: 'User Management' });
+        refresh();
+        showTempPassword(DB.find('users', (x) => x.id === id), 'Password direset');
+      },
+      async logout(id) {
+        const u = DB.find('users', (x) => x.id === id);
+        const r = await UI.confirm({ title: `Paksa logout ${u.name}?`, message: `${u.sessions} sesi aktif akan diakhiri. User perlu login ulang.`, confirmText: 'Paksa logout', tone: 'warning' });
+        if (!r.confirmed) return;
+        DB.update('users', (x) => x.id === id, (x) => { x.sessions = 0; });
+        DB.log({ action: 'Paksa logout user', docNo: u.email, module: 'User Management', changes: [{ field: 'Sesi aktif', before: String(u.sessions), after: '0' }] });
+        UI.toast(`Semua sesi ${u.name} telah diakhiri.`);
+        refresh();
+      },
+      async toggle(id) {
+        const u = DB.find('users', (x) => x.id === id);
+        const to = u.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        const r = await UI.confirm({ title: `${to === 'Nonaktif' ? 'Nonaktifkan' : 'Aktifkan'} ${u.name}?`, message: to === 'Nonaktif' ? 'User tidak bisa login dan semua sesi aktif diakhiri. Dokumen yang pernah dibuat tetap tersimpan.' : 'User dapat login kembali.', confirmText: to === 'Nonaktif' ? 'Nonaktifkan' : 'Aktifkan', tone: to === 'Nonaktif' ? 'danger' : 'primary', note: to === 'Nonaktif' ? { required: true, label: 'Alasan', placeholder: 'mis. resign, mutasi' } : null });
+        if (!r.confirmed) return;
+        DB.update('users', (x) => x.id === id, (x) => { x.status = to; if (to === 'Nonaktif') x.sessions = 0; });
+        DB.log({ action: to === 'Nonaktif' ? 'Menonaktifkan user' : 'Mengaktifkan user', docNo: u.email, module: 'User Management', reason: r.note, changes: [{ field: 'Status', before: u.status, after: to }] });
+        UI.toast(`${u.name} ${to === 'Aktif' ? 'diaktifkan' : 'dinonaktifkan'}.`);
+        refresh();
+      },
+    };
+  </script>
+</body>
+</html>

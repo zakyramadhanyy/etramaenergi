@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Masuk · ETrama</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="font-sans text-slate-900">
+  <main id="auth-content" class="w-full max-w-[400px]">
+    <p id="portal-chip" class="mb-4 inline-flex items-center gap-1.5 rounded-md bg-brand-soft px-2 py-1 text-xs font-semibold text-brand-navy"></p>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Masuk ke ETrama</h1>
+    <p class="mt-1.5 text-sm text-slate-600">Gunakan email dan password akun Anda.</p>
+
+    <div id="flash" class="mt-6 hidden" role="status"></div>
+    <div id="form-error" class="mt-6 hidden items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm font-medium text-red-800" role="alert"></div>
+
+    <form id="login-form" class="mt-6 space-y-5" novalidate>
+      <div data-field>
+        <label for="email" class="block text-sm font-medium text-slate-800">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" placeholder="nama@etrama.co.id" required
+          class="mt-1.5 block h-11 w-full rounded-lg border-slate-300 px-3.5 text-sm placeholder:text-slate-400 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20">
+      </div>
+      <div data-field>
+        <div class="flex items-center justify-between">
+          <label for="password" class="block text-sm font-medium text-slate-800">Password</label>
+          <a href="lupa-password.html" class="rounded text-sm font-semibold text-brand-blue hover:underline">Lupa Password?</a>
+        </div>
+        <div class="relative mt-1.5">
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Masukkan password" required
+            class="block h-11 w-full rounded-lg border-slate-300 pl-3.5 pr-11 text-sm placeholder:text-slate-400 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20">
+          <button type="button" data-toggle-password="password" class="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-lg text-slate-500 hover:text-slate-800"></button>
+        </div>
+      </div>
+      <button id="submit" type="submit" class="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-navy text-sm font-semibold text-white hover:bg-brand-navy-hover disabled:opacity-70">Masuk</button>
+    </form>
+
+    <p class="mt-6 text-center text-sm text-slate-600">Belum punya akun? Akun dibuat oleh Super Admin dan dikirim ke email Anda.</p>
+
+    <!-- ASUMSI: panel akun demo hanya untuk prototipe (tidak ada di produk). Klik baris untuk mengisi form. -->
+    <details class="group mt-8 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-sm">
+      <summary class="flex cursor-pointer list-none items-center justify-between rounded-xl px-4 py-3 font-medium text-slate-700">
+        Akun demo (simulasi)
+        <span class="text-slate-400 transition group-open:rotate-180" id="demo-chevron"></span>
+      </summary>
+      <div class="border-t border-slate-200 px-2 pb-2 pt-1">
+        <ul id="demo-list" class="divide-y divide-slate-200"></ul>
+        <p class="px-2 pb-1 pt-2 text-xs text-slate-500">Coba juga: email <span class="font-mono">anonim@etrama.co.id</span> → "Email belum terdaftar"; password salah → "Email atau password salah".</p>
+      </div>
+    </details>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.initAuth();
+
+    const params = new URLSearchParams(location.search);
+    const portal = params.get('portal');
+    const chip = document.getElementById('portal-chip');
+    if (portal === 'super-admin' || portal === 'finance') {
+      chip.innerHTML = `${UI.icon(portal === 'finance' ? 'briefcase' : 'key', 'w-3.5 h-3.5')}Portal ${portal === 'finance' ? 'Finance' : 'Super Admin'} <a href="../portal.html" class="ml-1 font-medium text-brand-blue underline-offset-2 hover:underline">Ganti</a>`;
+    } else chip.remove();
+
+    // Pesan setelah logout / reset password
+    const flash = document.getElementById('flash');
+    const flashMsg = params.has('logout') ? 'Anda telah keluar dari ETrama.'
+      : params.has('reset') ? 'Password berhasil diubah dan semua sesi aktif telah dikeluarkan. Silakan masuk dengan password baru.'
+        : '';
+    if (flashMsg) {
+      flash.className = 'mt-6 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800';
+      flash.innerHTML = `<span class="mt-0.5 text-emerald-600">${UI.icon('checkCircle')}</span><span>${flashMsg}</span>`;
+    }
+
+    // Akun demo
+    document.getElementById('demo-chevron').innerHTML = UI.icon('chevronDown');
+    const demoList = document.getElementById('demo-list');
+    demoList.innerHTML = DB.all('users').map((u) => {
+      const r = MOCK.roles[u.role];
+      const note = u.mustChangePassword && Auth.needsPasswordChange(u) ? ' · login pertama' : u.status === 'Nonaktif' ? ' · nonaktif' : '';
+      return `<li><button type="button" data-email="${UI.esc(u.email)}" data-pw="${UI.esc(Auth.currentPassword(u))}" class="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left hover:bg-white">
+        <span class="min-w-0"><span class="block truncate font-medium text-slate-800">${UI.esc(r.short || r.label)}${note}</span><span class="block truncate font-mono text-xs text-slate-500">${UI.esc(u.email)}</span></span>
+        <span class="shrink-0 font-mono text-xs text-slate-600">${UI.esc(Auth.currentPassword(u))}</span></button></li>`;
+    }).join('');
+    demoList.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-email]');
+      if (!b) return;
+      email.value = b.dataset.email;
+      password.value = b.dataset.pw;
+      clearErrors();
+      document.getElementById('submit').focus();
+    });
+
+    // Login
+    const form = document.getElementById('login-form');
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const formError = document.getElementById('form-error');
+    const submit = document.getElementById('submit');
+
+    function showError(msg) {
+      formError.innerHTML = `<span class="mt-0.5 text-red-600">${UI.icon('alert')}</span><span>${UI.esc(msg)}</span>`;
+      formError.classList.remove('hidden');
+      formError.classList.add('flex');
+    }
+    function clearErrors() {
+      formError.classList.add('hidden');
+      formError.classList.remove('flex');
+      UI.fieldError(email, '');
+      UI.fieldError(password, '');
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      clearErrors();
+      flash.classList.add('hidden');
+      let ok = true;
+      if (!email.value.trim()) { UI.fieldError(email, 'Email wajib diisi'); ok = false; }
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) { UI.fieldError(email, 'Format email tidak valid'); ok = false; }
+      if (!password.value) { UI.fieldError(password, 'Password wajib diisi'); ok = false; }
+      if (!ok) { form.querySelector('[aria-invalid="true"]').focus(); return; }
+
+      submit.disabled = true;
+      submit.innerHTML = `${UI.icon('loader', 'w-4 h-4 animate-spin')}Memeriksa…`;
+      setTimeout(() => {
+        submit.disabled = false;
+        submit.textContent = 'Masuk';
+        const user = Auth.findByEmail(email.value);
+        if (!user) { showError('Email belum terdaftar'); email.focus(); return; }
+        if (!Auth.checkPassword(user, password.value)) { showError('Email atau password salah'); password.select(); return; }
+        // ASUMSI: pesan untuk user nonaktif tidak ditentukan PRD (US-SA-08: user nonaktif tidak bisa login).
+        if (user.status === 'Nonaktif') { showError('Akun Anda nonaktif. Hubungi Super Admin.'); return; }
+        Auth.login(user);
+        window.location.href = Auth.needsPasswordChange(user) ? 'ganti-password.html' : Auth.homeFor(user);
+      }, 450);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Role Management · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div class="flex flex-wrap items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="note">
+      <span class="mt-0.5" data-icon="info"></span>
+      <p class="flex-1"><b>Role</b> menentukan menu dan fitur yang bisa dibuka. Wewenang submit & approve ditentukan <b>level hierarki</b>. Perubahan permission berlaku pada <b>login berikutnya</b>.</p>
+    </div>
+    <div class="grid gap-5 xl:grid-cols-[320px_1fr]">
+      <section class="card self-start" aria-labelledby="roles-title">
+        <div class="card-head"><h2 id="roles-title" class="card-title">Daftar role</h2><button type="button" id="add" class="btn btn-primary btn-sm">+ Buat role</button></div>
+        <ul id="roles" class="divide-y divide-slate-100"></ul>
+      </section>
+      <section class="card" aria-labelledby="matrix-title" id="matrix-card"></section>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'super-admin', active: 'role-management', title: 'Role Management', breadcrumb: ['Super Admin', 'Role Management'] });
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.dataset.icon); });
+    const { esc } = UI;
+    const ACTION_LABEL = { lihat: 'Lihat', buat: 'Buat', edit: 'Edit', hapus: 'Hapus', approve: 'Approve', export: 'Export' };
+    // ASUMSI: aksi yang tidak relevan per menu ditampilkan "—" (mis. Log History tidak punya edit/hapus karena read-only).
+    const APPLIES = {
+      log: ['lihat', 'export'], report: ['lihat', 'export'], approval: ['lihat', 'approve'],
+      hierarki: ['lihat', 'edit'], approvalSla: ['lihat', 'edit'], dokumen: ['lihat', 'edit'],
+    };
+    const applies = (m, a) => (APPLIES[m] || ['lihat', 'buat', 'edit', 'hapus', 'export']).includes(a);
+    const GROUPS = [['Super Admin', ['master', 'user', 'role', 'hierarki', 'approvalSla', 'dokumen', 'log']], ['Finance', ['so', 'bast', 'invoice', 'piutang', 'po', 'vendorPay', 'approval', 'report']]];
+    let selected = 'R-02';
+    let draft = null;
+
+    const userCount = (id) => DB.all('users').filter((u) => u.roleId === id).length;
+    function renderList() {
+      document.getElementById('roles').innerHTML = DB.all('rolesList').map((r) => `<li>
+        <button type="button" data-role="${r.id}" class="flex w-full items-start gap-3 px-5 py-3.5 text-left ${r.id === selected ? 'bg-brand-soft' : 'hover:bg-slate-50'}" ${r.id === selected ? 'aria-current="true"' : ''}>
+          <span class="mt-0.5 ${r.id === selected ? 'text-brand-navy' : 'text-slate-400'}">${UI.icon('shield')}</span>
+          <span class="min-w-0 flex-1"><span class="flex items-center gap-2"><span class="font-semibold text-slate-900">${esc(r.name)}</span>${r.builtin ? '<span class="rounded bg-slate-200 px-1.5 py-px text-2xs font-semibold uppercase text-slate-600">Bawaan</span>' : ''}</span>
+          <span class="mt-0.5 block text-xs text-slate-500">${userCount(r.id)} user</span></span>
+        </button></li>`).join('');
+      document.querySelectorAll('[data-role]').forEach((b) => b.addEventListener('click', () => select(b.dataset.role)));
+    }
+
+    function select(id) {
+      if (draft && JSON.stringify(draft) !== JSON.stringify(DB.find('rolesList', (r) => r.id === selected).perms)) {
+        UI.confirm({ title: 'Buang perubahan yang belum disimpan?', message: 'Perubahan permission pada role ini belum disimpan.', confirmText: 'Buang', tone: 'warning' }).then((r) => { if (r.confirmed) { draft = null; selected = id; render(); } });
+        return;
+      }
+      selected = id; draft = null; render();
+    }
+
+    function renderMatrix() {
+      const r = DB.find('rolesList', (x) => x.id === selected);
+      draft = draft || JSON.parse(JSON.stringify(r.perms));
+      // Role sistem (Super Admin, Admin Finance) dikunci; role custom hanya boleh diberi izin "Lihat" (sesuai fe_etrama).
+      const locked = !!r.builtin;
+      const cell = (m, a) => {
+        if (!applies(m, a)) return '<td class="text-center text-slate-300">—</td>';
+        const on = draft[m].includes(a);
+        const off = locked || a !== 'lihat';
+        const box = `<input type="checkbox" class="h-4 w-4 rounded border-slate-400 text-brand-blue focus:ring-brand-blue disabled:opacity-50" data-m="${m}" data-a="${a}" ${on ? 'checked' : ''} ${off ? 'disabled' : ''} aria-label="${esc(MOCK.menuLabels[m])} — ${ACTION_LABEL[a]}">`;
+        return `<td class="text-center">${!locked && a !== 'lihat' ? `<span class="tip" tabindex="0" data-tip="Role custom hanya dapat diberi izin Lihat">${box}</span>` : box}</td>`;
+      };
+      document.getElementById('matrix-card').innerHTML = `
+        <div class="card-head flex-wrap">
+          <div><h2 id="matrix-title" class="card-title">${esc(r.name)}</h2><p class="mt-0.5 max-w-2xl text-sm text-slate-600">${esc(r.desc)}</p></div>
+          <div class="flex gap-2">
+            ${r.builtin ? UI.disabledButton('Ubah nama & deskripsi', 'Role sistem tidak dapat diubah namanya.', 'btn btn-secondary btn-sm') + UI.disabledButton('Hapus role', 'Role sistem (Super Admin, Admin Finance) tidak dapat dihapus.', 'btn btn-secondary btn-sm') : `<button type="button" id="edit-info" class="btn btn-secondary btn-sm">Ubah nama & deskripsi</button><button type="button" id="del" class="btn btn-secondary btn-sm text-red-600">Hapus role</button>`}
+          </div>
+        </div>
+        <p class="mx-5 mt-4 flex items-start gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">${UI.icon(locked ? 'lock' : 'info', 'w-3.5 h-3.5 mt-px')}${locked ? 'Role sistem dikunci agar konfigurasi inti selalu dapat dikelola. Wewenang Admin Finance dibedakan oleh level hierarki, bukan permission.' : 'Role custom hanya dapat diberi izin <b class="font-semibold">Lihat</b>. Setiap perubahan tersimpan otomatis dan berlaku pada login berikutnya.'}</p>
+        <div class="overflow-x-auto p-5 pt-4">
+          <table class="tbl tbl-compact min-w-[640px]">
+            <thead><tr><th>Menu</th>${MOCK.ACTIONS.map((a) => `<th class="!text-center">${ACTION_LABEL[a]}</th>`).join('')}</tr></thead>
+            <tbody>${GROUPS.map(([g, ms]) => `<tr><td colspan="7" class="!bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">${g}</td></tr>${ms.map((m) => `<tr><td class="font-medium text-slate-800">${esc(MOCK.menuLabels[m])}</td>${MOCK.ACTIONS.map((a) => cell(m, a)).join('')}</tr>`).join('')}`).join('')}</tbody>
+          </table>
+        </div>
+        <p class="border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-500" id="dirty">${locked ? 'Baca saja.' : 'Tersimpan otomatis per sel.'}</p>`;
+      // Simpan langsung per sel (tanpa tombol Simpan) — umpan balik instan lewat toast (Doherty threshold).
+      document.querySelectorAll('[data-m]').forEach((c) => c.addEventListener('change', () => {
+        const m = c.dataset.m; const before = r.perms[m].map((a) => ACTION_LABEL[a]).join(', ') || '—';
+        draft[m] = c.checked ? ['lihat'] : [];
+        DB.update('rolesList', (x) => x.id === r.id, (x) => { x.perms[m] = draft[m].slice(); });
+        r.perms[m] = draft[m].slice();
+        DB.log({ action: 'Mengubah permission role', docNo: r.name, module: 'Role Management', changes: [{ field: MOCK.menuLabels[m], before, after: draft[m].map((a) => ACTION_LABEL[a]).join(', ') || '—' }] });
+        document.getElementById('dirty').textContent = `Tersimpan ${UI.formatTime(new Date())} · ${MOCK.menuLabels[m]}: ${c.checked ? 'Lihat' : 'tanpa akses'}`;
+        UI.toast(`${MOCK.menuLabels[m]} ${c.checked ? 'dapat dilihat' : 'tidak lagi dapat diakses'} oleh ${r.name}.`, { title: 'Tersimpan' });
+      }));
+      const ei = document.getElementById('edit-info'); if (ei) ei.addEventListener('click', () => openForm(r));
+      const del = document.getElementById('del');
+      if (del) del.addEventListener('click', async () => {
+        if (userCount(r.id)) { UI.toast(`Role masih dipakai ${userCount(r.id)} user. Pindahkan user ke role lain terlebih dahulu.`, { type: 'error' }); return; }
+        const res = await UI.confirm({ title: `Hapus role ${r.name}?`, message: 'Role yang dihapus tidak bisa dipulihkan.', confirmText: 'Hapus', tone: 'danger' });
+        if (!res.confirmed) return;
+        DB.remove('rolesList', (x) => x.id === r.id);
+        DB.log({ action: 'Menghapus role', docNo: r.name, module: 'Role Management' });
+        selected = 'R-02'; draft = null; render();
+        UI.toast(`Role ${r.name} dihapus.`);
+      });
+    }
+
+    const slug = (v) => String(v || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    function openForm(r) {
+      UI.formModal({
+        title: r ? 'Ubah role' : 'Buat role baru', description: r ? '' : 'Setelah dibuat, atur permission per menu pada matriks.',
+        body: `<div data-field><label class="label" for="r-name">Nama role <span class="req">*</span></label><input id="r-name" class="input" required value="${esc(r ? r.name : '')}" placeholder="mis. Finance Viewer"><p class="hint">Slug: <code id="r-slug" class="font-mono text-slate-700">${esc(slug(r ? r.name : ''))}</code> · dibuat otomatis</p></div>
+          <div data-field><label class="label" for="r-desc">Deskripsi <span class="req">*</span></label><textarea id="r-desc" class="input" rows="3" required placeholder="Jelaskan tujuan role ini">${esc(r ? r.desc : '')}</textarea></div>
+          ${r ? '' : `<div><label class="label" for="r-copy">Salin akses lihat dari</label><select id="r-copy" class="input"><option value="">— Mulai kosong —</option>${DB.all('rolesList').map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>`}`,
+        submitText: r ? 'Simpan' : 'Buat role',
+        onOpen(w) { const n = w.querySelector('#r-name'); n.addEventListener('input', () => { w.querySelector('#r-slug').textContent = slug(n.value) || '—'; }); },
+        onSubmit(form) {
+          if (!UI.validateRequired(form)) return false;
+          const name = form.querySelector('#r-name').value.trim();
+          const desc = form.querySelector('#r-desc').value.trim();
+          if (DB.find('rolesList', (x) => x.name.toLowerCase() === name.toLowerCase() && (!r || x.id !== r.id))) { UI.fieldError(form.querySelector('#r-name'), 'Nama role sudah ada'); return false; }
+          if (r) {
+            DB.update('rolesList', (x) => x.id === r.id, (x) => { x.name = name; x.desc = desc; });
+            DB.log({ action: 'Mengubah role', docNo: name, module: 'Role Management', changes: r.name !== name ? [{ field: 'Nama', before: r.name, after: name }] : [] });
+          } else {
+            const src = form.querySelector('#r-copy').value;
+            const base = src ? DB.find('rolesList', (x) => x.id === src).perms : {};
+            const perms = Object.fromEntries(MOCK.MENU_KEYS.map((k) => [k, (base[k] || []).includes('lihat') ? ['lihat'] : []]));
+            const id = 'R-' + String(Math.max(...DB.all('rolesList').map((x) => parseInt(x.id.slice(2), 10))) + 1).padStart(2, '0');
+            DB.insert('rolesList', { id, name, desc, builtin: false, perms });
+            DB.log({ action: 'Membuat role', docNo: name, module: 'Role Management' });
+            selected = id; draft = null;
+            UI.toast(`Role ${name} dibuat. Atur permission-nya di matriks.`);
+          }
+          render();
+          return true;
+        },
+      });
+    }
+    document.getElementById('add').addEventListener('click', () => openForm(null));
+    function render() { renderList(); renderMatrix(); }
+    render();
+  </script>
+</body>
+</html>

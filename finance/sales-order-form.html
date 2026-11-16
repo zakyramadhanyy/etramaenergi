@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Input Sales Order · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <!-- Wizard 2 langkah (sesuai fe_etrama): 1) header + item, 2) Term of Payment.
+         UX: chunking (Miller) + goal-gradient — user fokus satu kelompok keputusan per langkah. -->
+    <ol id="stepper" class="flex flex-wrap items-center gap-2 text-sm" aria-label="Langkah input Sales Order"></ol>
+    <div id="late-banner" class="hidden"></div>
+    <form id="so-form" novalidate class="space-y-5">
+      <div data-step="1" class="space-y-5">
+      <!-- 1. Header dokumen -->
+      <section class="card" aria-labelledby="h-title">
+        <div class="card-head"><div><h2 id="h-title" class="card-title">Dokumen dari Staf BD</h2><p class="mt-0.5 text-xs text-slate-500">SPK / PO Klien / Kontrak Kerja diterima via WA Grup, maks. H+1 hari kerja setelah disetujui klien.</p></div><div class="text-right"><p class="text-xs text-slate-500">No. SO internal</p><p id="so-no" class="font-mono text-sm font-semibold text-brand-navy"></p></div></div>
+        <div class="card-body grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <fieldset class="md:col-span-2 xl:col-span-4"><legend class="label">Jenis dokumen <span class="req">*</span></legend>
+            <div class="mt-1.5 inline-flex rounded-lg border border-slate-300 bg-slate-50 p-0.5" id="doctype">
+              <label class="cursor-pointer"><input type="radio" name="docType" value="SPK" class="peer sr-only" required><span class="block rounded-md px-4 py-1.5 text-sm font-medium text-slate-600 peer-checked:bg-white peer-checked:text-brand-navy peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-brand-blue">SPK</span></label>
+              <label class="cursor-pointer"><input type="radio" name="docType" value="PO Klien" class="peer sr-only"><span class="block rounded-md px-4 py-1.5 text-sm font-medium text-slate-600 peer-checked:bg-white peer-checked:text-brand-navy peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-brand-blue">PO Klien</span></label>
+              <label class="cursor-pointer"><input type="radio" name="docType" value="Kontrak Kerja" class="peer sr-only" checked><span class="block rounded-md px-4 py-1.5 text-sm font-medium text-slate-600 peer-checked:bg-white peer-checked:text-brand-navy peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-brand-blue">Kontrak Kerja</span></label>
+            </div>
+          </fieldset>
+          <div data-field><label class="label" for="f-docno">No. dokumen klien <span class="req">*</span></label><input id="f-docno" class="input" required placeholder="mis. ALM/KTR/IX/2026/09"></div>
+          <div data-field><label class="label" for="f-approved">Tgl disetujui klien <span class="req">*</span></label><input id="f-approved" type="date" class="input" required></div>
+          <div data-field><label class="label" for="f-received">Tgl diterima dari Staf BD <span class="req">*</span></label><input id="f-received" type="date" class="input" required></div>
+          <div data-field><label class="label" for="f-bd">Staf Business Development <span class="req">*</span></label><select id="f-bd" class="input" required></select></div>
+          <div data-field class="md:col-span-2"><label class="label" for="f-client">Client <span class="req">*</span></label><select id="f-client" class="input" required></select><p class="hint">Hanya client aktif. Belum ada? Minta Super Admin menambahkan di Master Client.</p></div>
+          <div class="md:col-span-2"><label class="label" for="f-pic">PIC client</label><input id="f-pic" class="input" readonly placeholder="Terisi otomatis dari master client"></div>
+          <div data-field class="md:col-span-2"><label class="label" for="f-project">Project / reference <span class="req">*</span></label><input id="f-project" class="input" required placeholder="mis. PLTS Atap Pabrik Pakan Lampung"></div>
+          <div data-field><label class="label" for="f-location">Lokasi instalasi <span class="req">*</span></label><input id="f-location" class="input" required></div>
+          <div><label class="label" for="f-kwp">Kapasitas sistem (kWp) <span class="text-xs font-normal text-slate-500">opsional</span></label><input id="f-kwp" type="number" min="0" step="0.1" class="input num"></div>
+          <div class="md:col-span-2" id="dz-doc"></div>
+          <div class="md:col-span-2" id="dz-guarantee"></div>
+        </div>
+      </section>
+
+      <!-- 2. Item -->
+      <section class="card" aria-labelledby="i-title">
+        <div class="card-head"><h2 id="i-title" class="card-title">Item pekerjaan</h2><button type="button" id="add-item" class="btn btn-secondary btn-sm">+ Tambah item</button></div>
+        <div class="overflow-x-auto">
+          <table class="tbl tbl-compact min-w-[860px]"><thead><tr><th class="w-[34%]">Item / deskripsi</th><th class="!text-right">Qty</th><th>Satuan</th><th class="!text-right">Harga satuan (Rp)</th><th class="!text-right">Diskon (Rp)</th><th class="!text-right">Subtotal</th><th><span class="sr-only">Aksi</span></th></tr></thead><tbody id="items"></tbody></table>
+        </div>
+        <div class="flex justify-end border-t border-slate-200 px-5 py-4">
+          <dl class="w-full max-w-sm space-y-1.5 text-sm num">
+            <div class="flex justify-between"><dt class="text-slate-600">DPP</dt><dd id="s-dpp" class="font-medium"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-600">PPN <span id="s-rate"></span>% <span class="text-xs text-slate-400">(dari setting)</span></dt><dd id="s-ppn" class="font-medium"></dd></div>
+            <div class="flex justify-between border-t border-slate-200 pt-1.5 text-base"><dt class="font-semibold">Nilai kontrak</dt><dd id="s-total" class="font-bold text-brand-navy"></dd></div>
+          </dl>
+        </div>
+      </section>
+
+      </div>
+      <div data-step="2" class="space-y-5" hidden>
+      <section id="recap" class="card card-body flex flex-wrap items-center gap-x-8 gap-y-3 text-sm" aria-label="Ringkasan langkah 1"></section>
+      <!-- 3. ToP -->
+      <section class="card" aria-labelledby="t-title" id="top-card">
+        <div class="card-head flex-wrap"><div><h2 id="t-title" class="card-title">Term of Payment</h2><p class="mt-0.5 text-xs text-slate-500">Dibaca AI dari dokumen yang di-upload · <b>wajib direview & dikonfirmasi manusia</b> · AI tidak pernah membuat invoice tanpa konfirmasi.</p></div><div id="top-status"></div></div>
+        <div id="top-body" class="card-body"></div>
+      </section>
+      </div>
+    </form>
+
+    <div class="sticky bottom-0 z-20 -mx-4 mt-6 border-t border-slate-200 bg-white/95 backdrop-blur sm:-mx-6 lg:-mx-8">
+      <div class="mx-auto flex max-w-content flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <ul id="checklist" class="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-live="polite"></ul>
+        <div class="flex gap-2"><a href="sales-order-list.html" id="cancel" class="btn btn-secondary">Batal</a><button type="button" id="back" class="btn btn-secondary" hidden>← Kembali</button><button type="button" id="next" class="btn btn-primary">Lanjut: Term of Payment →</button><button type="button" id="submit" class="btn btn-primary" hidden disabled>Simpan Sales Order</button></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'sales-order-form', title: 'Input Sales Order', breadcrumb: ['Finance', 'Sales Order', 'Input'], perm: 'so', need: 'buat' });
+    if (ctx.allowed) main();
+    function main() {
+    const { esc, formatRupiah: rp, icon } = UI;
+    const $ = (id) => document.getElementById(id);
+    const editNo = new URLSearchParams(location.search).get('no');
+    const editing = editNo ? DB.so(editNo) : null;
+
+    const S = DB.settings();
+    const soNo = editing ? editing.no : DB.nextNo(S.numbering.so, DB.all('salesOrders').map((s) => s.no), MOCK.today);
+    $('so-no').textContent = soNo + (editing ? ' (revisi)' : '');
+    $('s-rate').textContent = S.ppnRate;
+
+    /* ---------- Dropdown master (hanya aktif) ---------- */
+    const clients = DB.all('clients').filter((c) => c.status === 'Aktif' || (editing && c.code === editing.clientCode));
+    $('f-client').innerHTML = '<option value="">Pilih client…</option>' + clients.map((c) => `<option value="${c.code}">${esc(c.name)}${c.status !== 'Aktif' ? ' (nonaktif)' : ''}</option>`).join('');
+    const bds = DB.all('stafBD').filter((b) => b.status === 'Aktif' || (editing && b.id === editing.bdId));
+    $('f-bd').innerHTML = '<option value="">Pilih Staf BD…</option>' + bds.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+    $('f-client').addEventListener('change', () => { const c = DB.client($('f-client').value); $('f-pic').value = c ? c.pic : ''; validate(); });
+
+    /* ---------- Upload ---------- */
+    const dzDoc = UI.dropzone($('dz-doc'), { id: 'doc-file', label: 'Upload dokumen SPK / PO / Kontrak', required: true, onChange: (f) => { if (f.length && state.mode === 'empty') readAI(); validate(); } });
+    $('dz-doc').insertAdjacentHTML('beforeend', '<button type="button" id="demo-doc" class="mt-2 text-xs font-medium text-brand-blue hover:underline">Simulasi: gunakan contoh dokumen kontrak</button>');
+    $('demo-doc').addEventListener('click', () => dzDoc.set([{ name: 'Kontrak_PLTS_Contoh.pdf', size: 2.4 * 1048576 }]));
+    const dzGuar = UI.dropzone($('dz-guarantee'), { id: 'guar-file', label: 'Dokumen jaminan: Bank Garansi / Asuransi / EAR (opsional)', multiple: true, accept: ['pdf', 'jpg', 'jpeg', 'png'], hint: 'PDF, JPG, PNG · maks. 10 MB · cukup di-upload (SOP Ketentuan Khusus A No. 2)' });
+
+    /* ---------- State ---------- */
+    const state = { items: [], top: [], mode: 'empty', confirmed: false, ai: null };
+
+    /* ---------- Item ---------- */
+    const itemCalc = (it) => Math.max(0, (Number(it.qty) || 0) * (Number(it.price) || 0) - (Number(it.disc) || 0));
+    const totals = () => { const dpp = Calc.sum(state.items, itemCalc); const ppn = Math.round(dpp * S.ppnRate / 100); return { dpp, ppn, total: dpp + ppn }; };
+    const digits = (v) => Number(String(v).replace(/\D/g, '')) || 0;
+    function renderItems() {
+      $('items').innerHTML = state.items.map((it, i) => `<tr>
+        <td><label class="sr-only" for="it-d-${i}">Deskripsi item ${i + 1}</label><input id="it-d-${i}" data-i="${i}" data-f="desc" class="input input-sm" value="${esc(it.desc)}" placeholder="mis. Panel surya 550 Wp"></td>
+        <td><label class="sr-only" for="it-q-${i}">Qty</label><input id="it-q-${i}" data-i="${i}" data-f="qty" type="number" min="0" class="input input-sm w-20 text-right num" value="${it.qty}"></td>
+        <td><label class="sr-only" for="it-u-${i}">Satuan</label><input id="it-u-${i}" data-i="${i}" data-f="unit" class="input input-sm w-20" value="${esc(it.unit)}" list="units"></td>
+        <td><label class="sr-only" for="it-p-${i}">Harga satuan</label><input id="it-p-${i}" data-i="${i}" data-f="price" inputmode="numeric" data-money class="input input-sm w-36 text-right num" value="${UI.formatNumber(it.price)}"></td>
+        <td><label class="sr-only" for="it-x-${i}">Diskon</label><input id="it-x-${i}" data-i="${i}" data-f="disc" inputmode="numeric" data-money class="input input-sm w-32 text-right num" value="${UI.formatNumber(it.disc)}"></td>
+        <td class="r font-medium text-slate-900" id="it-s-${i}">${rp(itemCalc(it))}</td>
+        <td class="r"><button type="button" class="btn btn-ghost btn-sm btn-icon text-slate-500" data-rm="${i}" aria-label="Hapus item ${i + 1}" ${state.items.length === 1 ? 'disabled' : ''}>${icon('x')}</button></td></tr>`).join('') + '<datalist id="units"><option>pcs</option><option>unit</option><option>lot</option><option>set</option><option>meter</option></datalist>';
+      $('items').querySelectorAll('input').forEach((el) => el.addEventListener('input', () => {
+        const it = state.items[el.dataset.i]; const f = el.dataset.f;
+        it[f] = el.dataset.money !== undefined ? digits(el.value) : (f === 'qty' ? Number(el.value) : el.value);
+        $(`it-s-${el.dataset.i}`).textContent = rp(itemCalc(it));
+        renderTotals();
+      }));
+      $('items').querySelectorAll('[data-money]').forEach((el) => el.addEventListener('blur', () => { el.value = UI.formatNumber(digits(el.value)); }));
+      $('items').querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { state.items.splice(Number(b.dataset.rm), 1); renderItems(); renderTotals(); }));
+    }
+    $('add-item').addEventListener('click', () => { state.items.push({ desc: '', qty: 1, unit: 'lot', price: 0, disc: 0 }); renderItems(); $(`it-d-${state.items.length - 1}`).focus(); });
+    function renderTotals() {
+      const t = totals();
+      $('s-dpp').textContent = rp(t.dpp); $('s-ppn').textContent = rp(t.ppn); $('s-total').textContent = rp(t.total);
+      state.top.forEach((r) => { if (!r.amountManual) r.amount = r.pct == null ? 0 : Math.round(t.total * r.pct / 100); });
+      if (['ai', 'manual'].includes(state.mode)) syncTopAmounts();
+      validate();
+    }
+
+    /* ---------- ToP (AI) ---------- */
+    // Simulasi hasil ekstraksi AI. conf: 'low' = keyakinan rendah → ditandai kuning & wajib dicek.
+    const AI_RESULT = [
+      { label: 'Uang muka (DP)', pct: 30, trigger: 'date', triggerText: '14 hari kalender setelah kontrak ditandatangani', dueText: '14 hari setelah invoice diterima', retention: '',
+        src: { pct: ['Pasal 5 ayat (1)', 'Uang muka sebesar 30% (tiga puluh persen) dari Nilai Kontrak'], trigger: ['Pasal 5 ayat (1)', '…dibayarkan paling lambat 14 (empat belas) hari kalender setelah Kontrak ditandatangani Para Pihak.'], dueText: ['Pasal 5 ayat (4)', 'Setiap tagihan wajib dibayar dalam jangka waktu yang disepakati Para Pihak.'], retention: ['—', 'Tidak disebutkan untuk termin ini.'] },
+        low: ['dueText'], conf: 92 },
+      { label: 'Material tiba', pct: 60, trigger: 'milestone', triggerText: 'Seluruh material utama tiba di lokasi', dueText: '14 hari setelah invoice diterima', retention: '',
+        src: { pct: ['Pasal 5 ayat (2)', 'Pembayaran Tahap II sebesar 60% (enam puluh persen) dari Nilai Kontrak'], trigger: ['Pasal 5 ayat (2)', '…setelah seluruh material utama (panel surya, inverter, dan struktur) tiba di lokasi dan diterima PIHAK PERTAMA, dibuktikan dengan Berita Acara Penerimaan Material.'], dueText: ['Pasal 5 ayat (2)', '…dibayarkan selambat-lambatnya 14 (empat belas) hari kalender setelah invoice diterima.'], retention: ['—', 'Tidak disebutkan untuk termin ini.'] },
+        low: [], conf: 97 },
+      { label: 'Setelah BAST', pct: null, trigger: 'milestone', triggerText: 'BAST ditandatangani kedua pihak', dueText: '30 hari setelah invoice diterima', retention: '5% selama masa pemeliharaan 6 bulan',
+        src: { pct: ['Pasal 5 ayat (3)', 'Sisa pembayaran dibayarkan setelah Berita Acara Serah Terima (BAST) ditandatangani Para Pihak.'], trigger: ['Pasal 5 ayat (3)', '…setelah Berita Acara Serah Terima (BAST) ditandatangani Para Pihak.'], dueText: ['Pasal 5 ayat (3)', '…dalam waktu 30 (tiga puluh) hari kalender setelah invoice diterima.'], retention: ['Pasal 7', 'Ketentuan retensi mengacu pada Lampiran C Kontrak.'] },
+        low: ['pct', 'retention'], conf: 58, note: 'AI tidak menemukan persentase eksplisit untuk termin ini.' },
+    ];
+    const FIELD_LABEL = { pct: 'Persentase', trigger: 'Pemicu', dueText: 'Jatuh tempo', retention: 'Retensi' };
+
+    function readAI(fail) {
+      state.mode = 'reading'; state.confirmed = false; renderTop();
+      setTimeout(() => {
+        if (fail) { state.mode = 'failed'; state.top = [blankRow()]; }
+        else {
+          state.mode = 'ai';
+          state.ai = JSON.parse(JSON.stringify(AI_RESULT));
+          state.top = state.ai.map((r) => Object.assign({ checked: {} }, JSON.parse(JSON.stringify(r))));
+        }
+        renderTotals(); renderTop();
+      }, 1100);
+    }
+    const blankRow = () => ({ label: '', pct: null, trigger: 'milestone', triggerText: '', dueText: '', retention: '', low: [], checked: {} });
+
+    function statusBadge() {
+      if (state.confirmed) return UI.badge('ToP dikonfirmasi', { tone: 'green', icon: 'checkCircle' });
+      if (state.mode === 'ai') return UI.badge('Hasil AI · perlu review', { tone: 'yellow', icon: 'alert' });
+      if (state.mode === 'manual' || state.mode === 'failed') return UI.badge('Input manual', { tone: 'blue', icon: 'fileText' });
+      return UI.badge('Belum ada ToP', { tone: 'gray', icon: 'minus' });
+    }
+
+    function renderTop() {
+      $('top-status').innerHTML = statusBadge();
+      const body = $('top-body');
+      if (state.mode === 'empty') {
+        body.innerHTML = `<div class="flex flex-col items-center gap-3 rounded-lg border-2 border-dashed border-slate-200 px-6 py-10 text-center">
+          <span class="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand-navy">${icon('fileText', 'w-5 h-5')}</span>
+          <p class="text-sm font-semibold text-slate-900">Upload dokumen di langkah 1 agar AI membaca Term of Payment</p>
+          <p class="max-w-md text-sm text-slate-600">AI mengekstrak termin, persentase, pemicu, jatuh tempo, dan retensi. Dokumen klien tidak dipakai untuk melatih model pihak ketiga.</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="go-manual">Isi ToP manual</button></div>`;
+        $('go-manual').addEventListener('click', () => { state.mode = 'manual'; state.top = [blankRow()]; renderTop(); validate(); });
+        return;
+      }
+      if (state.mode === 'reading') {
+        body.innerHTML = `<div class="flex items-center gap-3 rounded-lg bg-brand-soft/60 px-4 py-6 text-sm text-brand-navy" role="status">${icon('loader', 'w-5 h-5 animate-spin')}AI sedang membaca Term of Payment dari dokumen…</div>`;
+        return;
+      }
+      const locked = state.confirmed;
+      const isAI = state.mode === 'ai';
+      const t = totals();
+      const head = isAI
+        ? `<div class="mb-4 flex flex-wrap items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">${icon('alert', 'w-4 h-4 mt-0.5')}<div class="flex-1"><p class="font-semibold">Hasil AI wajib direview manusia sebelum dikonfirmasi.</p><p class="mt-0.5">Bandingkan setiap field dengan potongan teks asli di sampingnya. Field <span class="rounded bg-amber-200 px-1">berwarna kuning</span> memiliki tingkat keyakinan rendah dan wajib dicek.</p></div>${locked ? '' : '<button type="button" id="retry-fail" class="text-xs font-medium underline">Simulasi: AI gagal membaca</button>'}</div>`
+        : `<div class="mb-4 flex flex-wrap items-start gap-3 rounded-lg ${state.mode === 'failed' ? 'border border-red-200 bg-red-50 text-red-800' : 'border border-slate-200 bg-slate-50 text-slate-700'} px-4 py-3 text-sm">${icon(state.mode === 'failed' ? 'xCircle' : 'info', 'w-4 h-4 mt-0.5')}<p class="flex-1">${state.mode === 'failed' ? '<b>AI gagal membaca file</b> (dokumen hasil scan buram / tidak memuat ToP). Isi jadwal termin secara manual.' : 'Isi jadwal termin secara manual.'}</p>${dzDoc.files().length && !locked ? '<button type="button" id="retry-ai" class="text-xs font-semibold underline">Baca ulang dengan AI</button>' : ''}</div>`;
+      const fld = (r, i, f, inner) => {
+        const low = (r.low || []).includes(f) && !locked;
+        const chk = low ? `<label class="mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-800"><input type="checkbox" data-chk="${i}" data-f="${f}" class="h-3.5 w-3.5 rounded border-amber-500 text-amber-600 focus:ring-amber-500" ${r.checked[f] ? 'checked' : ''}>Sudah saya cek</label>` : '';
+        return `<div class="${low && !r.checked[f] ? 'low-conf' : ''} rounded-md p-1.5">${inner}${chk}</div>`;
+      };
+      const src = (r, f) => (isAI && r.src && r.src[f] ? `<div class="rounded-md border-l-2 ${(r.low || []).includes(f) ? 'border-amber-400 bg-amber-50/60' : 'border-slate-300 bg-slate-50'} px-2.5 py-1.5"><p class="text-2xs font-semibold uppercase tracking-wide text-slate-500">${FIELD_LABEL[f]} · ${esc(r.src[f][0])}</p><p class="mt-0.5 text-xs italic text-slate-700">“${esc(r.src[f][1])}”</p></div>` : '');
+      const dis = locked ? 'disabled' : '';
+      body.innerHTML = head + `<div class="space-y-3" id="top-rows">${state.top.map((r, i) => `
+        <div class="grid gap-4 rounded-xl border border-slate-200 p-4 ${isAI ? 'lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]' : ''}">
+          <div class="grid gap-2 sm:grid-cols-6">
+            <div class="flex items-center gap-2 sm:col-span-6"><span class="grid h-6 w-6 place-items-center rounded-full bg-brand-navy text-xs font-semibold text-white">${i + 1}</span>
+              <label class="sr-only" for="tp-l-${i}">Nama termin ${i + 1}</label><input id="tp-l-${i}" data-i="${i}" data-f="label" class="input input-sm flex-1 font-medium" value="${esc(r.label)}" placeholder="Nama termin (mis. DP)" ${dis}>
+              ${isAI && r.conf != null ? `<span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium num ${r.conf < 80 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-700'}" title="Skor keyakinan AI untuk termin ini">Keyakinan ${r.conf}%</span>` : ''}
+              ${!locked && state.top.length > 1 ? `<button type="button" class="btn btn-ghost btn-sm btn-icon" data-rmt="${i}" aria-label="Hapus termin ${i + 1}">${icon('x')}</button>` : ''}</div>
+            <div class="sm:col-span-2">${fld(r, i, 'pct', `<label class="text-xs font-medium text-slate-600" for="tp-p-${i}">Persentase (%)</label><input id="tp-p-${i}" data-i="${i}" data-f="pct" type="number" min="0" max="100" step="0.01" class="input input-sm mt-1 text-right num" value="${r.pct == null ? '' : r.pct}" placeholder="—" ${dis}>`)}</div>
+            <div class="sm:col-span-4 p-1.5"><label class="text-xs font-medium text-slate-600" for="tp-a-${i}">Nominal (Rp)</label><input id="tp-a-${i}" data-i="${i}" data-f="amount" inputmode="numeric" class="input input-sm mt-1 text-right num" value="${UI.formatNumber(r.amount || 0)}" ${dis}></div>
+            <div class="sm:col-span-6">${fld(r, i, 'trigger', `<span class="text-xs font-medium text-slate-600" id="tp-tl-${i}">Pemicu</span><div class="mt-1 flex gap-2"><select data-i="${i}" data-f="trigger" class="input input-sm w-36" aria-labelledby="tp-tl-${i}" ${dis}><option value="date" ${r.trigger === 'date' ? 'selected' : ''}>Tanggal</option><option value="milestone" ${r.trigger === 'milestone' ? 'selected' : ''}>Milestone</option></select><input data-i="${i}" data-f="triggerText" class="input input-sm flex-1" value="${esc(r.triggerText)}" aria-labelledby="tp-tl-${i}" placeholder="mis. BAST ditandatangani" ${dis}></div>`)}</div>
+            <div class="sm:col-span-3">${fld(r, i, 'dueText', `<label class="text-xs font-medium text-slate-600" for="tp-d-${i}">Jatuh tempo</label><input id="tp-d-${i}" data-i="${i}" data-f="dueText" class="input input-sm mt-1" value="${esc(r.dueText)}" placeholder="mis. 14 hari setelah invoice diterima" ${dis}>`)}</div>
+            <div class="sm:col-span-3">${fld(r, i, 'retention', `<label class="text-xs font-medium text-slate-600" for="tp-r-${i}">Retensi</label><input id="tp-r-${i}" data-i="${i}" data-f="retention" class="input input-sm mt-1" value="${esc(r.retention)}" placeholder="Kosongkan bila tidak ada" ${dis}>`)}</div>
+            ${r.note && !locked ? `<p class="sm:col-span-6 text-xs font-medium text-amber-800">${icon('info', 'inline w-3.5 h-3.5 -mt-0.5 mr-1')}${esc(r.note)}</p>` : ''}
+          </div>
+          ${isAI ? `<div class="space-y-2"><p class="text-xs font-semibold text-slate-500">Teks asli dokumen</p>${['pct', 'trigger', 'dueText', 'retention'].map((f) => src(r, f)).join('')}</div>` : ''}
+        </div>`).join('')}</div>
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-4 text-sm num" id="top-sums"></div>
+          <div class="flex gap-2">
+            ${locked ? '<button type="button" id="unlock" class="btn btn-secondary">Ubah ToP</button>' : `<button type="button" id="add-term" class="btn btn-secondary">+ Tambah termin</button><span class="tip" tabindex="0" id="confirm-tip"><button type="button" id="confirm-top" class="btn btn-navy">${icon('checkCircle')}Konfirmasi ToP</button></span>`}
+          </div>
+        </div>`;
+      bindTop();
+      syncTopAmounts();
+    }
+
+    function syncTopAmounts() {
+      const t = totals();
+      state.top.forEach((r, i) => { const el = $(`tp-a-${i}`); if (el && document.activeElement !== el) el.value = UI.formatNumber(r.amount || 0); });
+      const sp = Math.round(Calc.sum(state.top, (r) => Number(r.pct) || 0) * 100) / 100;
+      const sa = Calc.sum(state.top, (r) => r.amount || 0);
+      const okP = sp === 100; const okA = sa === t.total && t.total > 0;
+      if ($('top-sums')) $('top-sums').innerHTML = `<span class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-semibold ${okP ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}">${icon(okP ? 'checkCircle' : 'alert', 'w-4 h-4')}Total termin: ${String(sp).replace('.', ',')}% ${okP ? '✓' : '⚠'}</span>
+        <span class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-semibold ${okA ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}">${icon(okA ? 'checkCircle' : 'alert', 'w-4 h-4')}Σ nominal ${rp(sa)} ${okA ? '= Total SO ✓' : `≠ Total SO ${rp(t.total)} ⚠`}</span>`;
+      const pendingLow = state.top.some((r) => (r.low || []).some((f) => !r.checked[f]));
+      const btn = $('confirm-top');
+      if (btn) {
+        const reason = !okP ? 'Total persentase termin harus 100%.' : !okA ? 'Total nominal termin harus sama dengan Total SO.' : pendingLow ? 'Cek semua field berwarna kuning terlebih dahulu.' : state.top.some((r) => !r.label.trim()) ? 'Nama setiap termin wajib diisi.' : '';
+        btn.disabled = !!reason;
+        $('confirm-tip').dataset.tip = reason || 'Konfirmasi jadwal termin';
+        if (!reason) $('confirm-tip').removeAttribute('data-tip');
+      }
+      validate();
+    }
+
+    function bindTop() {
+      const body = $('top-body');
+      body.querySelectorAll('[data-f]').forEach((el) => el.addEventListener('input', () => {
+        const r = state.top[el.dataset.i]; const f = el.dataset.f;
+        if (f === 'pct') { r.pct = el.value === '' ? null : Number(el.value); r.amountManual = false; r.amount = r.pct == null ? 0 : Math.round(totals().total * r.pct / 100); }
+        else if (f === 'amount') { r.amount = digits(el.value); r.amountManual = true; const tt = totals().total; r.pct = tt ? Math.round((r.amount / tt) * 10000) / 100 : 0; const p = $(`tp-p-${el.dataset.i}`); if (p) p.value = r.pct; }
+        else r[f] = el.value;
+        syncTopAmounts();
+      }));
+      body.querySelectorAll('[data-chk]').forEach((c) => c.addEventListener('change', () => { state.top[c.dataset.chk].checked[c.dataset.f] = c.checked; renderTop(); }));
+      body.querySelectorAll('[data-rmt]').forEach((b) => b.addEventListener('click', () => { state.top.splice(Number(b.dataset.rmt), 1); renderTop(); }));
+      const add = $('add-term'); if (add) add.addEventListener('click', () => { state.top.push(blankRow()); renderTop(); $(`tp-l-${state.top.length - 1}`).focus(); });
+      const conf = $('confirm-top'); if (conf) conf.addEventListener('click', confirmTop);
+      const un = $('unlock'); if (un) un.addEventListener('click', () => { state.confirmed = false; renderTop(); });
+      const rf = $('retry-fail'); if (rf) rf.addEventListener('click', () => readAI(true));
+      const ra = $('retry-ai'); if (ra) ra.addEventListener('click', () => readAI(false));
+    }
+
+    async function confirmTop() {
+      const lowCount = state.top.reduce((n, r) => n + (r.low || []).length, 0);
+      const r = await UI.confirm({ title: 'Konfirmasi Term of Payment?', message: `${state.top.length} termin, total 100%. ${state.mode === 'ai' ? `${lowCount} field berkeyakinan rendah sudah Anda cek. ` : ''}Setelah SO disimpan, sistem membentuk jadwal invoice untuk setiap termin.`, confirmText: 'Konfirmasi ToP', tone: 'primary' });
+      if (!r.confirmed) return;
+      state.confirmed = true;
+      renderTop();
+      UI.toast('ToP dikonfirmasi. Hasil AI dan nilai final disimpan untuk audit saat SO disimpan.');
+    }
+
+    /* ---------- Banner H+1 ---------- */
+    function lateCheck() {
+      const a = $('f-approved').value; const b = $('f-received').value;
+      const el = $('late-banner');
+      if (!a || !b) { el.className = 'hidden'; return 0; }
+      if (b < a) { UI.fieldError($('f-received'), 'Tanggal diterima tidak boleh sebelum tanggal disetujui klien'); el.className = 'hidden'; return -1; }
+      UI.fieldError($('f-received'), '');
+      const wd = Cal.workdaysBetween(a, b);
+      if (wd > Cal.slaDays('kirimDokumen')) {
+        el.className = 'flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900';
+        el.innerHTML = `${icon('alert', 'w-4 h-4 mt-0.5')}<p><b>Dokumen diterima H+${wd} hari kerja</b> setelah disetujui klien (SLA Staf BD maks. H+1). Penanda keterlambatan akan tersimpan di Sales Order ini.</p>`;
+      } else el.className = 'hidden';
+      return wd;
+    }
+    ['f-approved', 'f-received'].forEach((id) => $(id).addEventListener('change', () => { lateCheck(); validate(); }));
+    document.querySelectorAll('#so-form [required]').forEach((el) => el.addEventListener('input', () => { UI.fieldError(el, ''); validate(); }));
+
+    /* ---------- Validasi ---------- */
+    function checks() {
+      const reqOk = ['f-docno', 'f-approved', 'f-received', 'f-bd', 'f-client', 'f-project', 'f-location'].every((id) => $(id).value.trim()) && lateCheck() >= 0;
+      const t = totals();
+      const sp = Math.round(Calc.sum(state.top, (r) => Number(r.pct) || 0) * 100) / 100;
+      const sa = Calc.sum(state.top, (r) => r.amount || 0);
+      return [
+        ['Header lengkap', reqOk],
+        ['Dokumen di-upload', dzDoc.files().length > 0 || !!editing],
+        ['Item & nilai kontrak', t.total > 0 && state.items.every((it) => it.desc.trim())],
+        ['Σ% termin = 100%', state.top.length > 0 && sp === 100],
+        ['Σ nominal = Total SO', state.top.length > 0 && sa === t.total],
+        ['ToP dikonfirmasi', state.confirmed],
+      ];
+    }
+    /* ---------- Wizard ---------- */
+    let step = 1;
+    const STEPS = ['Dokumen & item', 'Term of Payment'];
+    function renderStepper() {
+      $('stepper').innerHTML = STEPS.map((l, i) => { const n = i + 1; const done = n < step; const cur = n === step;
+        return `<li class="flex items-center gap-2">${i ? '<span class="h-px w-8 bg-slate-300" aria-hidden="true"></span>' : ''}<span class="grid h-7 w-7 place-items-center rounded-full text-xs font-semibold num ${done ? 'bg-emerald-500 text-white' : cur ? 'bg-brand-navy text-white' : 'border border-slate-300 bg-white text-slate-500'}">${done ? icon('check', 'w-3.5 h-3.5') : n}</span><span class="${cur ? 'font-semibold text-slate-900' : 'text-slate-500'}" ${cur ? 'aria-current="step"' : ''}>${l}</span></li>`; }).join('')
+        + `<li class="ml-auto text-xs text-slate-500">No. SO <span class="font-mono font-semibold text-brand-navy">${esc(soNo)}</span></li>`;
+    }
+    function goStep(n) {
+      step = n;
+      document.querySelectorAll('[data-step]').forEach((el) => { el.hidden = Number(el.dataset.step) !== n; });
+      $('next').hidden = n !== 1; $('submit').hidden = n !== 2; $('back').hidden = n !== 2; $('cancel').hidden = n !== 1;
+      if (n === 2) {
+        const t = totals(); const c = DB.client($('f-client').value);
+        $('recap').innerHTML = [['Client', c ? esc(c.name) : '—'], ['Proyek', esc($('f-project').value)], ['Dokumen', `${esc(document.querySelector('[name="docType"]:checked').value)} <span class="font-mono">${esc($('f-docno').value)}</span>`], ['Nilai kontrak', `<span class="font-semibold text-brand-navy num">${rp(t.total)}</span>`]]
+          .map(([k, v]) => `<div><p class="text-xs text-slate-500">${k}</p><p class="mt-0.5 font-medium text-slate-900">${v}</p></div>`).join('') + '<button type="button" id="edit-step1" class="btn btn-ghost btn-sm ml-auto">Ubah</button>';
+        $('edit-step1').addEventListener('click', () => goStep(1));
+      }
+      renderStepper(); validate();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    $('next').addEventListener('click', () => {
+      // Validasi saat klik (bukan tombol nonaktif): fokus ke field pertama yang bermasalah.
+      if (!UI.validateRequired(document.querySelector('[data-step="1"]'))) return;
+      const c = checks().slice(0, 3).find((x) => !x[1]);
+      if (c) { UI.toast(c[0] === 'Dokumen di-upload' ? 'Upload dokumen SPK / PO / Kontrak terlebih dahulu.' : c[0] === 'Item & nilai kontrak' ? 'Lengkapi deskripsi item dan pastikan nilai kontrak lebih dari Rp 0.' : 'Lengkapi header dokumen.', { type: 'error', title: 'Langkah 1 belum lengkap' }); return; }
+      goStep(2);
+    });
+    $('back').addEventListener('click', () => goStep(1));
+
+    function validate() {
+      const c = checks().filter((_, i) => (step === 1 ? i < 3 : i >= 3));
+      $('checklist').innerHTML = c.map(([l, ok]) => `<li class="flex items-center gap-1 ${ok ? 'text-emerald-700' : 'text-slate-500'}">${icon(ok ? 'checkCircle' : 'circle', 'w-3.5 h-3.5')}${l}<span class="sr-only">${ok ? ' terpenuhi' : ' belum'}</span></li>`).join('');
+      $('submit').disabled = !checks().every((x) => x[1]);
+    }
+
+    /* ---------- Simpan ---------- */
+    $('submit').addEventListener('click', async () => {
+      if (!UI.validateRequired($('so-form'))) return;
+      const t = totals();
+      const late = lateCheck() > Cal.slaDays('kirimDokumen');
+      const soApproval = S.approval.docs.find((d) => d.key === 'so').layers.some((l) => l.active);
+      const r = await UI.confirm({ title: editing ? `Simpan revisi ${soNo}?` : `Simpan ${soNo}?`, message: `Nilai kontrak ${rp(t.total)} dengan ${state.top.length} termin. ${soApproval ? 'SO akan menunggu approval sesuai setting.' : 'SO disimpan dengan status Aktif tanpa approval (dokumen sudah disetujui klien).'}`, confirmText: 'Simpan', note: editing ? { required: true, label: 'Alasan revisi', placeholder: 'mis. adendum kontrak nilai item' } : null });
+      if (!r.confirmed) return;
+      const so = {
+        no: soNo, docType: document.querySelector('[name="docType"]:checked').value, clientDocNo: $('f-docno').value.trim(), approvedDate: $('f-approved').value, receivedDate: $('f-received').value,
+        clientCode: $('f-client').value, bdId: $('f-bd').value, project: $('f-project').value.trim(), location: $('f-location').value.trim(), kwp: Number($('f-kwp').value) || null,
+        items: state.items.map((it) => [it.desc.trim(), Number(it.qty), it.unit, Number(it.price), Number(it.disc) || 0]), ppnRate: S.ppnRate,
+        top: state.top.map((x, i) => ({ no: i + 1, label: x.label.trim(), pct: x.pct, trigger: x.trigger, triggerText: x.triggerText, dueText: x.dueText, retention: x.retention, amount: x.amountManual ? x.amount : undefined })),
+        topSource: state.mode === 'ai' ? 'AI' : 'Manual', aiResult: state.ai, lateReceived: late,
+        status: soApproval ? 'Menunggu Approval' : 'Aktif', createdBy: editing ? editing.createdBy : ctx.user.id, createdAt: editing ? editing.createdAt : Cal.nowIso(),
+        files: dzDoc.files().map((f) => f.name).concat(editing && !dzDoc.files().length ? editing.files : []), guarantee: dzGuar.files().map((f) => f.name).concat(editing && !dzGuar.files().length ? editing.guarantee : []),
+      };
+      if (editing) {
+        DB.update('salesOrders', (s) => s.no === soNo, (s) => Object.assign(s, so));
+        DB.log({ action: 'Revisi Sales Order', docNo: soNo, module: 'Sales Order', reason: r.note, changes: [{ field: 'Nilai kontrak', before: rp(Calc.soTotals(editing).total), after: rp(t.total) }] });
+      } else {
+        DB.insert('salesOrders', so);
+        DB.log({ action: 'Membuat Sales Order', docNo: soNo, module: 'Sales Order', reason: late ? 'Dokumen diterima > H+1 dari Staf BD' : '', changes: [{ field: 'ToP', before: so.topSource === 'AI' ? 'Hasil AI: ' + state.ai.map((x) => (x.pct == null ? '?' : x.pct) + '%').join(' / ') : '—', after: 'Final: ' + so.top.map((x) => x.pct + '%').join(' / ') }] });
+        // Jadwal invoice: termin berpemicu tanggal langsung dibuat draft-nya.
+        if (so.status === 'Aktif') {
+          so.top.filter((x) => x.trigger === 'date').forEach((x) => {
+            const no = DB.nextNo(S.numbering.invoice, DB.all('invoices').map((i) => i.no), MOCK.today);
+            const bank = S.banks.find((b) => b.isDefault);
+            DB.insert('invoices', { no, rev: 0, soNo, term: x.no, date: MOCK.today, due: Cal.addDays(MOCK.today, 14), status: 'Draft', createdBy: ctx.user.id, bankId: bank && bank.id, history: [{ at: Cal.nowIso(), by: ctx.user.id, action: 'Draft dibuat otomatis dari jadwal termin', note: '' }] });
+            DB.log({ action: 'Membuat draft invoice', docNo: no, module: 'Invoice', reason: `Termin ${x.no} ${so.no}` });
+          });
+        }
+      }
+      location.href = `sales-order-detail.html?no=${encodeURIComponent(soNo)}&saved=1`;
+    });
+
+    /* ---------- Inisialisasi ---------- */
+    if (editing) {
+      document.querySelector(`[name="docType"][value="${editing.docType}"]`).checked = true;
+      $('f-docno').value = editing.clientDocNo; $('f-approved').value = editing.approvedDate; $('f-received').value = editing.receivedDate;
+      $('f-client').value = editing.clientCode; $('f-pic').value = DB.client(editing.clientCode).pic; $('f-bd').value = editing.bdId;
+      $('f-project').value = editing.project; $('f-location').value = editing.location; $('f-kwp').value = editing.kwp || '';
+      state.items = editing.items.map(([desc, qty, unit, price, disc]) => ({ desc, qty, unit, price, disc }));
+      const terms = Calc.terms(editing);
+      state.top = editing.top.map((x, i) => Object.assign({ low: [], checked: {} }, x, { amount: terms[i].amount, amountManual: x.amount != null }));
+      state.mode = 'manual'; state.confirmed = true;
+      $('dz-doc').insertAdjacentHTML('beforeend', `<p class="mt-2 text-xs text-slate-500">File tersimpan: ${editing.files.map(esc).join(', ')}</p>`);
+    } else {
+      $('f-approved').value = Cal.addDays(MOCK.today, -3); $('f-received').value = MOCK.today;
+      state.items = [{ desc: 'Panel surya monocrystalline 550 Wp', qty: 0, unit: 'pcs', price: 0, disc: 0 }];
+    }
+    renderItems(); renderTotals(); renderTop(); lateCheck(); goStep(1);
+    }
+  </script>
+</body>
+</html>

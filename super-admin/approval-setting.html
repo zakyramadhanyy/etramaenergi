@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Layer Approval & Threshold · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <!-- Lingkup sesuai fe_etrama: hanya workflow finance.invoice yang aktif. Step dapat ditambah, dihapus, diurutkan. -->
+  <main id="page-content" class="space-y-6">
+    <div id="docs" class="space-y-5"></div>
+    <section class="card card-body flex items-start gap-3 text-sm text-slate-600"><span class="text-slate-400" data-icon="info"></span><p><b class="font-semibold text-slate-800">Workflow lain:</b> Sales Order tidak memakai approval (dokumen sudah disetujui klien), revisi invoice dari klien mengikuti alur invoice, dan catatan pembayaran vendor tanpa approval internal.</p></section>
+    <div class="sticky bottom-0 z-20 -mx-4 mt-6 border-t border-slate-200 bg-white/95 backdrop-blur sm:-mx-6 lg:-mx-8">
+      <div class="mx-auto flex max-w-content items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <p id="dirty" class="text-sm text-slate-500">Tidak ada perubahan.</p>
+        <div class="flex gap-2"><button type="button" id="reset" class="btn btn-secondary" disabled>Batalkan</button><button type="button" id="save" class="btn btn-primary" disabled>Simpan pengaturan</button></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'super-admin', active: 'approval-setting', title: 'Layer Approval & Threshold', breadcrumb: ['Super Admin', 'Approval & SLA', 'Layer Approval'] });
+    const { esc, formatRupiah, icon } = UI;
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon); });
+    const saved = () => DB.settings().approval;
+    let draft = JSON.parse(JSON.stringify(saved()));
+    const digits = (v) => Number(String(v).replace(/\D/g, '')) || 0;
+    const LEVELS = { lead: 'Lead', mgr_ops: 'Manager', direktur: 'Direktur' };
+    const inv = () => draft.docs.find((d) => d.key === 'invoice');
+    const sw = (id, on, label, disabled, tip) => (tip ? `<span class="tip" tabindex="0" data-tip="${esc(tip)}">${UI.switchHtml(id, on, label, disabled)}</span>` : UI.switchHtml(id, on, label, disabled));
+
+    function render() {
+      const d = inv();
+      d.layers.forEach((l) => { if (l.skipIfEqual == null) l.skipIfEqual = draft.autoSkip; });
+      d.threshold.tiers.forEach((t) => { if (t.active == null) t.active = true; });
+      const active = d.layers.filter((l) => l.active);
+      const steps = d.layers.map((l, i) => {
+        const lastGuard = l.active && active.length === 1;
+        return `<li class="flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4">
+          <div class="flex flex-col" aria-label="Urutan step ${i + 1}">
+            <button type="button" class="btn btn-ghost btn-sm btn-icon !h-6 !w-6" data-up="${i}" aria-label="Naikkan step ${i + 1}" ${i === 0 ? 'disabled' : ''}>${icon('chevronDown', 'w-3.5 h-3.5 rotate-180')}</button>
+            <button type="button" class="btn btn-ghost btn-sm btn-icon !h-6 !w-6" data-down="${i}" aria-label="Turunkan step ${i + 1}" ${i === d.layers.length - 1 ? 'disabled' : ''}>${icon('chevronDown', 'w-3.5 h-3.5')}</button>
+          </div>
+          <span class="grid h-7 w-7 place-items-center rounded-full text-xs font-semibold num ${l.active ? 'bg-brand-navy text-white' : 'bg-slate-200 text-slate-500'}">${i + 1}</span>
+          <div class="min-w-[180px] flex-1"><label class="label" for="lv-${i}">Level wajib</label>
+            <select id="lv-${i}" data-lv="${i}" class="input">${Object.entries(LEVELS).map(([k, v]) => `<option value="${k}" ${k === l.key ? 'selected' : ''} ${k !== l.key && d.layers.some((x) => x.key === k) ? 'disabled' : ''}>${v}</option>`).join('')}</select></div>
+          <label class="flex items-center gap-2 text-sm text-slate-700">${sw(`act-${i}`, l.active, `Step ${i + 1} wajib`, lastGuard, lastGuard ? 'Minimal satu step approval invoice harus aktif.' : '')}Wajib</label>
+          <label class="flex items-center gap-2 text-sm text-slate-700">${sw(`skip-${i}`, l.skipIfEqual, `Lewati otomatis step ${i + 1}`)}Lewati otomatis jika pembuat setara</label>
+          ${d.layers.length > 1 && !lastGuard ? `<button type="button" class="btn btn-ghost btn-sm btn-icon text-red-600" data-rmstep="${i}" aria-label="Hapus step ${i + 1}">${icon('x')}</button>` : '<span class="w-8"></span>'}
+        </li>`;
+      }).join('');
+      const t = d.threshold;
+      const free = Object.keys(LEVELS).filter((k) => !d.layers.some((x) => x.key === k));
+      document.getElementById('docs').innerHTML = `
+        <section class="card" aria-labelledby="doc-inv">
+          <div class="card-head"><div><h2 id="doc-inv" class="card-title">Step approval invoice <span class="ml-1 font-mono text-xs text-slate-400">finance.invoice</span></h2><p class="mt-0.5 text-xs text-slate-500">Diajukan Staff → step aktif berurutan → (Direktur bila mencapai threshold) → Disetujui</p></div>${UI.badge(`${active.length} step aktif`, { tone: 'blue', icon: 'badgeCheck' })}</div>
+          <ol class="divide-y divide-slate-100 border-t border-slate-100">${steps}</ol>
+          <div class="border-t border-slate-100 px-5 py-3">${free.length ? `<button type="button" id="add-step" class="btn btn-secondary btn-sm">${icon('plus', 'w-3.5 h-3.5')}Tambah step</button>` : '<p class="text-xs text-slate-500">Semua level sudah dipakai sebagai step.</p>'}</div>
+        </section>
+        <section class="card" aria-labelledby="thr-title">
+          <div class="card-head"><div><h2 id="thr-title" class="card-title">Threshold nominal</h2><p class="mt-0.5 text-xs text-slate-500">Invoice dengan nilai ≥ batas memicu reviewer tambahan (Direktur).</p></div>${sw('thr-on', t.enabled, 'Aktifkan threshold')}</div>
+          <div class="${t.enabled ? '' : 'opacity-50'} space-y-2 border-t border-slate-100 px-5 py-4">
+            ${t.tiers.map((tier, ti) => `<div class="flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3">
+              <div class="min-w-[220px] flex-1"><label class="label" for="tier-${ti}">Nilai invoice ≥</label><input id="tier-${ti}" inputmode="numeric" class="input num" data-tier="${ti}" value="${formatRupiah(tier.min)}" ${t.enabled ? '' : 'disabled'}></div>
+              <div class="min-w-[160px]"><label class="label" for="appr-${ti}">Reviewer tambahan</label><select id="appr-${ti}" class="input" ${t.enabled ? '' : 'disabled'}><option>Direktur</option></select></div>
+              <label class="mb-2 flex items-center gap-2 text-sm text-slate-700">${sw(`tact-${ti}`, tier.active, `Threshold ${ti + 1} aktif`, !t.enabled)}Aktif</label>
+              <button type="button" class="btn btn-ghost btn-icon mb-0.5 text-red-600" data-rmtier="${ti}" aria-label="Hapus threshold ${ti + 1}" ${t.tiers.length === 1 || !t.enabled ? 'disabled' : ''}>${icon('x')}</button>
+            </div>`).join('')}
+            <button type="button" class="btn btn-secondary btn-sm" id="add-tier" ${t.enabled ? '' : 'disabled'}>${icon('plus', 'w-3.5 h-3.5')}Tambah threshold</button>
+          </div>
+        </section>`;
+      const on = (sel, fn) => document.querySelectorAll(sel).forEach((el) => el.addEventListener('click', () => { fn(el); render(); }));
+      const move = (i, dir) => { const a = d.layers; [a[i], a[i + dir]] = [a[i + dir], a[i]]; };
+      on('[data-up]', (el) => move(Number(el.dataset.up), -1));
+      on('[data-down]', (el) => move(Number(el.dataset.down), 1));
+      on('[data-rmstep]', (el) => d.layers.splice(Number(el.dataset.rmstep), 1));
+      d.layers.forEach((l, i) => {
+        const a = document.getElementById(`act-${i}`); if (a && !a.disabled) a.addEventListener('click', () => { l.active = !l.active; render(); });
+        document.getElementById(`skip-${i}`).addEventListener('click', () => { l.skipIfEqual = !l.skipIfEqual; render(); });
+      });
+      document.querySelectorAll('[data-lv]').forEach((el) => el.addEventListener('change', () => { const l = d.layers[el.dataset.lv]; l.key = el.value; l.label = LEVELS[el.value]; l.status = Flow.ROLE_STATUS[el.value]; render(); }));
+      const add = document.getElementById('add-step'); if (add) add.addEventListener('click', () => { const k = free[0]; d.layers.push({ key: k, label: LEVELS[k], status: Flow.ROLE_STATUS[k], active: true, skipIfEqual: true }); render(); });
+      document.getElementById('thr-on').addEventListener('click', () => { t.enabled = !t.enabled; render(); });
+      t.tiers.forEach((tier, ti) => { const x = document.getElementById(`tact-${ti}`); if (x && !x.disabled) x.addEventListener('click', () => { tier.active = !tier.active; render(); }); });
+      document.querySelectorAll('[data-tier]').forEach((el) => {
+        el.addEventListener('input', () => { t.tiers[el.dataset.tier].min = digits(el.value); dirty(); });
+        el.addEventListener('blur', () => { el.value = formatRupiah(digits(el.value)); });
+      });
+      const at = document.getElementById('add-tier'); if (at) at.addEventListener('click', () => { t.tiers.push({ min: Math.max(...t.tiers.map((x) => x.min)) * 2, approver: 'direktur', active: true }); render(); });
+      on('[data-rmtier]', (el) => t.tiers.splice(Number(el.dataset.rmtier), 1));
+      dirty();
+    }
+    const desc = (d) => d.layers.map((l, i) => `${i + 1}. ${LEVELS[l.key] || l.label}${l.active ? '' : ' (nonaktif)'}${l.skipIfEqual ? ' · lewati otomatis' : ''}`).join('; ');
+    const thrDesc = (t) => (t.enabled ? t.tiers.map((x) => `≥ ${formatRupiah(x.min)}${x.active === false ? ' (nonaktif)' : ''}`).join(', ') : 'Nonaktif');
+    function diff() {
+      const o = saved().docs.find((d) => d.key === 'invoice'); const d = inv(); const out = [];
+      const norm = (x) => Object.assign({}, x, { layers: x.layers.map((l) => Object.assign({}, l, { skipIfEqual: l.skipIfEqual != null ? l.skipIfEqual : saved().autoSkip })) });
+      if (desc(norm(o)) !== desc(d)) out.push({ field: 'Step approval invoice', before: desc(norm(o)), after: desc(d) });
+      if (thrDesc(o.threshold) !== thrDesc(d.threshold)) out.push({ field: 'Threshold nominal', before: thrDesc(o.threshold), after: thrDesc(d.threshold) });
+      return out;
+    }
+    function dirty() {
+      const n = diff().length;
+      document.getElementById('dirty').textContent = n ? `${n} perubahan belum disimpan.` : 'Tidak ada perubahan.';
+      document.getElementById('dirty').className = `text-sm ${n ? 'font-medium text-amber-700' : 'text-slate-500'}`;
+      document.getElementById('save').disabled = !n; document.getElementById('reset').disabled = !n;
+    }
+    document.getElementById('reset').addEventListener('click', () => { draft = JSON.parse(JSON.stringify(saved())); render(); });
+    document.getElementById('save').addEventListener('click', async () => {
+      const invCfg = inv();
+      if (invCfg.threshold.enabled && invCfg.threshold.tiers.some((t) => !t.min)) { UI.toast('Nominal threshold wajib diisi.', { type: 'error' }); return; }
+      const changes = diff();
+      const r = await UI.confirm({ title: 'Simpan pengaturan approval?', message: `${changes.length} perubahan akan berlaku untuk dokumen yang diajukan berikutnya.`, confirmText: 'Simpan', note: { required: false, label: 'Alasan perubahan', placeholder: 'Opsional, tercatat di log history' } });
+      if (!r.confirmed) return;
+      invCfg.threshold.tiers.sort((a, b) => a.min - b.min);
+      const s = DB.settings(); s.approval = draft; DB.saveSettings(s);
+      DB.log({ action: 'Mengubah pengaturan approval', docNo: 'Approval setting', module: 'Approval & SLA', reason: r.note, changes });
+      draft = JSON.parse(JSON.stringify(saved()));
+      UI.toast('Pengaturan approval disimpan.');
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>

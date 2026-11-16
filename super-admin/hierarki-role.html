@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hierarki Role · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <section class="card" aria-labelledby="lvl-title">
+      <div class="card-head"><h2 id="lvl-title" class="card-title">Level jabatan (SOP 01.001-00)</h2><span class="text-xs text-slate-500">Urutan dari bawah ke atas</span></div>
+      <ol id="levels" class="grid gap-px overflow-hidden rounded-b-xl bg-slate-200 sm:grid-cols-2 xl:grid-cols-4"></ol>
+    </section>
+    <div class="grid gap-5 xl:grid-cols-[1fr_380px]">
+      <section class="card" aria-labelledby="tree-title">
+        <div class="card-head"><div><h2 id="tree-title" class="card-title">Struktur atasan langsung</h2><p class="mt-0.5 text-sm text-slate-600">Relasi atasan langsung dipakai sistem untuk menentukan reviewer dan approver.</p></div></div>
+        <div id="tree" class="card-body overflow-x-auto"></div>
+      </section>
+      <section class="card self-start" aria-labelledby="route-title">
+        <div class="card-head"><h2 id="route-title" class="card-title">Simulasi jalur review invoice</h2></div>
+        <div class="card-body space-y-4">
+          <div><label for="maker" class="label">Pembuat invoice</label><select id="maker" class="input"></select></div>
+          <div><label for="amount" class="label">Nilai invoice</label><select id="amount" class="input"><option value="250000000">Rp 250.000.000 (di bawah threshold)</option><option value="900000000">Rp 900.000.000 (di atas threshold)</option></select></div>
+          <ol id="route" class="space-y-2"></ol>
+          <p class="text-xs text-slate-500">Mengikuti pengaturan <a class="font-medium text-brand-blue hover:underline" href="approval-setting.html">Layer Approval & Threshold</a>, termasuk aturan skip otomatis.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'super-admin', active: 'hierarki-role', title: 'Hierarki Role', breadcrumb: ['Super Admin', 'Hierarki Role'] });
+    const { esc } = UI;
+    const RANK = { staf: 1, lead: 2, mgr_ops: 3, direktur: 4 };
+    const LEVELS = [
+      ['Staff', 'Staf Finance', 'Input Sales Order, membuat & mengirim invoice, penagihan, mencatat pembayaran, input PO & invoice vendor.'],
+      ['Lead', 'Lead Finance & Accounting', 'Review & approve invoice (layer 1), memastikan penagihan sesuai BAST, memverifikasi laporan piutang.'],
+      ['Manager', 'Manager', 'Manager: review invoice (layer 2). Manager: menerima eskalasi piutang.'],
+      ['Direktur', 'Direksi', 'Approver tertinggi bila budget threshold aktif; bersama Lead F&A memutuskan tindakan atas piutang bermasalah.'],
+    ];
+    document.getElementById('levels').innerHTML = LEVELS.map(([lvl, jab, desc], i) => `<li class="bg-white p-5">
+      <p class="flex items-center gap-2"><span class="grid h-6 w-6 place-items-center rounded-full bg-brand-navy text-xs font-semibold text-white">${i + 1}</span><span class="font-semibold text-slate-900">${lvl}</span></p>
+      <p class="mt-2 text-xs font-medium text-brand-navy">${jab}</p><p class="mt-1 text-sm text-slate-600">${desc}</p>
+      <p class="mt-3 text-xs text-slate-500">${DB.all('users').filter((u) => MOCK.roles[u.role] && MOCK.roles[u.role].level === lvl && u.status === 'Aktif').length} user aktif</p></li>`).join('');
+
+    function node(u) {
+      const kids = DB.all('users').filter((x) => x.supervisorId === u.id).sort((a, b) => RANK[b.role] - RANK[a.role]);
+      return `<li class="relative">
+        <div class="inline-flex items-center gap-3 rounded-lg border ${u.status === 'Aktif' ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-slate-50 opacity-70'} px-3 py-2 shadow-sm">
+          <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-navy">${esc(u.name.split(' ').slice(0, 2).map((w) => w[0]).join(''))}</span>
+          <span><span class="block text-sm font-semibold text-slate-900">${esc(u.name)}</span><span class="block text-xs text-slate-500">${esc(MOCK.roles[u.role].label)} · ${MOCK.roles[u.role].level}${u.status !== 'Aktif' ? ' · Nonaktif' : ''}</span></span>
+          ${u.role !== 'direktur' ? `<button type="button" class="btn btn-ghost btn-sm ml-2" data-sup="${u.id}">Ubah atasan</button>` : ''}
+        </div>
+        ${kids.length ? `<ul class="ml-5 mt-2 space-y-2 border-l-2 border-slate-200 pl-5">${kids.map(node).join('')}</ul>` : ''}
+      </li>`;
+    }
+    function renderTree() {
+      const users = DB.all('users').filter((u) => u.role !== 'super_admin');
+      const roots = users.filter((u) => !u.supervisorId || !users.find((x) => x.id === u.supervisorId));
+      document.getElementById('tree').innerHTML = `<ul class="space-y-2">${roots.map(node).join('')}</ul>`;
+      document.querySelectorAll('[data-sup]').forEach((b) => b.addEventListener('click', () => editSup(b.dataset.sup)));
+      renderMakers();
+    }
+
+    function editSup(id) {
+      const u = DB.find('users', (x) => x.id === id);
+      const opts = DB.all('users').filter((x) => x.status === 'Aktif' && RANK[x.role] > RANK[u.role]);
+      UI.formModal({
+        title: `Atasan langsung — ${u.name}`, description: `${MOCK.roles[u.role].label} · level ${MOCK.roles[u.role].level}. Hanya user dengan level lebih tinggi yang dapat dipilih.`,
+        body: `<div><label for="s" class="label">Atasan langsung</label><select id="s" class="input">${opts.map((x) => `<option value="${x.id}" ${x.id === u.supervisorId ? 'selected' : ''}>${esc(x.name)} — ${esc(MOCK.roles[x.role].label)}</option>`).join('')}</select></div>`,
+        onSubmit(form) {
+          const v = form.querySelector('#s').value;
+          if (v === u.supervisorId) return true;
+          DB.update('users', (x) => x.id === id, (x) => { x.supervisorId = v; });
+          DB.log({ action: 'Mengubah atasan langsung', docNo: u.email, module: 'Hierarki Role', changes: [{ field: 'Atasan langsung', before: u.supervisorId ? DB.user(u.supervisorId).name : '—', after: DB.user(v).name }] });
+          UI.toast('Atasan langsung diperbarui.');
+          renderTree();
+          return true;
+        },
+      });
+    }
+
+    function renderMakers() {
+      const sel = document.getElementById('maker');
+      const cur = sel.value;
+      sel.innerHTML = DB.all('users').filter((u) => ['staf', 'lead'].includes(u.role) && u.status === 'Aktif').map((u) => `<option value="${u.id}">${esc(u.name)} — ${esc(MOCK.roles[u.role].label)}</option>`).join('');
+      if (cur) sel.value = cur;
+      renderRoute();
+    }
+    function renderRoute() {
+      const maker = DB.user(document.getElementById('maker').value);
+      const total = Number(document.getElementById('amount').value);
+      const route = Flow.route({ createdBy: maker.id, total });
+      const cfg = Flow.config();
+      const skipped = cfg.layers.filter((l) => l.active && !route.includes(l.status));
+      const who = (status) => {
+        const key = Object.keys(Flow.ROLE_STATUS).find((k) => Flow.ROLE_STATUS[k] === status);
+        const u = DB.all('users').find((x) => x.role === key && x.status === 'Aktif');
+        return u ? u.name : '—';
+      };
+      const step = (n, title, sub, tone) => `<li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${tone}">${n}</span><span><span class="block text-sm font-medium text-slate-900">${title}</span><span class="block text-xs text-slate-500">${sub}</span></span></li>`;
+      document.getElementById('route').innerHTML = [
+        step(1, 'Submit', `${esc(maker.name)} (${esc(MOCK.roles[maker.role].label)})`, 'bg-slate-200 text-slate-700'),
+        ...route.map((s, i) => step(i + 2, esc(s), esc(who(s)), 'bg-brand-blue text-white')),
+        step(route.length + 2, 'Disetujui', 'Siap dikirim ke klien', 'bg-emerald-600 text-white'),
+      ].join('') + skipped.map((l) => `<li class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">${UI.icon('info', 'inline w-3.5 h-3.5 -mt-0.5 mr-1')}Layer ${esc(l.label)} di-skip otomatis karena pembuat memiliki level yang sama atau lebih tinggi.</li>`).join('');
+    }
+    document.getElementById('maker').addEventListener('change', renderRoute);
+    document.getElementById('amount').addEventListener('change', renderRoute);
+    renderTree();
+  </script>
+</body>
+</html>

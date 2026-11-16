@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BAST · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <!-- ASUMSI: upload BAST memakai modal (sesuai fe_etrama) — field sedikit, user tetap melihat daftar termin yang menunggu.
+       Dapat dibuka langsung dari detail SO: bast.html?so=…&term=… (SO & termin terisi otomatis). -->
+  <main id="page-content" class="space-y-6">
+    <div class="flex flex-wrap items-center gap-4 rounded-3xl bg-[#F6F7F8] px-6 py-5">
+      <span class="text-brand-blue" data-icon="info"></span>
+      <p class="min-w-0 flex-1 text-sm text-slate-700">BAST (atau berita acara lain yang ditandatangani kedua pihak) dikirim Lead Project via email maks. H+1. Setelah di-upload, sistem membuat <b class="font-semibold">draft invoice</b> untuk termin terkait.</p>
+      <div id="page-actions"></div>
+    </div>
+    <section class="card" aria-labelledby="wait-title"><div class="card-head"><div><h2 id="wait-title" class="card-title">Termin menunggu BAST / berita acara</h2><p class="mt-0.5 text-xs text-slate-500">Lintas semua Sales Order aktif · klik Upload untuk mengisi otomatis SO & termin</p></div><span id="wait-count"></span></div><div id="wait" class="overflow-x-auto"></div></section>
+    <section aria-labelledby="hist-title"><h2 id="hist-title" class="mb-3 text-sm font-semibold text-slate-900">Riwayat BAST</h2><div id="table"></div></section>
+
+    <div id="bast-modal" class="fixed inset-0 z-[60] hidden items-end justify-center p-4 sm:items-center [&:not(.hidden)]:flex">
+      <div class="absolute inset-0 bg-slate-900/50" data-close-modal></div>
+      <form id="bast-form" novalidate class="modal-panel relative flex max-h-[92vh] w-full max-w-lg flex-col rounded-[20px] bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="up-title">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+          <div><h2 id="up-title" class="text-base font-medium text-slate-900">Upload BAST</h2><p class="mt-0.5 text-sm text-slate-600">Draft invoice termin terkait dibuat otomatis.</p></div>
+          <button type="button" data-close-modal class="btn btn-ghost btn-sm btn-icon -mr-2" aria-label="Tutup"></button>
+        </div>
+        <div class="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+          <div data-field><label class="label" for="b-so">Sales Order <span class="req">*</span></label><select id="b-so" class="input" required></select></div>
+          <div data-field><label class="label" for="b-term">Termin <span class="req">*</span></label><select id="b-term" class="input" required></select><p class="hint" id="term-hint"></p></div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div data-field><label class="label" for="b-type">Jenis dokumen <span class="req">*</span></label><select id="b-type" class="input" required><option>BAST</option><option>BA Material Tiba</option><option>Laporan lain (ditandatangani kedua pihak)</option></select></div>
+            <div data-field><label class="label" for="b-no">No. dokumen <span class="req">*</span></label><input id="b-no" class="input" required placeholder="mis. BAST/ALM/2026/11/01"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div data-field><label class="label" for="b-date">Tanggal BAST <span class="req">*</span></label><input id="b-date" type="date" class="input" required></div>
+            <div data-field><label class="label" for="b-recv">Diterima dari Lead Project <span class="req">*</span></label><input id="b-recv" type="date" class="input" required></div>
+          </div>
+          <div id="late" class="hidden"></div>
+          <div id="dz"></div>
+        </div>
+        <div class="flex flex-col-reverse gap-2 border-t border-slate-200 px-6 py-4 sm:flex-row sm:justify-end">
+          <button type="button" class="btn btn-secondary" data-close-modal>Batal</button>
+          <button type="submit" class="btn btn-primary">Upload &amp; buat draft invoice</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'bast', title: 'BAST', breadcrumb: ['Finance', 'BAST'], perm: 'bast' });
+    const { esc, formatRupiah: rp, icon } = UI;
+    const $ = (id) => document.getElementById(id);
+    const canCreate = Layout.can('bast', 'buat');
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon, 'w-5 h-5'); });
+    $('page-actions').innerHTML = canCreate ? `<button type="button" id="open-upload" class="btn btn-primary">${icon('upload')}Upload BAST</button>` : UI.disabledButton(`${icon('upload')}Upload BAST`, 'Hanya level Staff yang dapat meng-upload BAST', 'btn btn-primary');
+    document.querySelector('#bast-modal button[aria-label="Tutup"]').innerHTML = icon('x');
+    const modal = $('bast-modal');
+    const openUpload = (soNo, term) => {
+      if (soNo) { $('b-so').value = soNo; fillTerms(); }
+      if (term) { $('b-term').value = String(term); termHint(); }
+      UI.openModal(modal);
+      setTimeout(() => (soNo ? $('b-no') : $('b-so')).focus(), 40);
+    };
+    modal.querySelectorAll('[data-close-modal]').forEach((b) => b.addEventListener('click', () => UI.closeModal(modal)));
+
+    function renderWait() {
+      const list = Calc.awaitingBast();
+      $('wait-count').innerHTML = UI.badge(`${list.length} termin`, { tone: 'gray', icon: 'clock' });
+      $('wait').innerHTML = list.length ? `<table class="tbl tbl-compact"><thead><tr><th>Sales Order</th><th>Termin</th><th>Pemicu</th><th class="!text-right">Nominal</th>${canCreate ? '<th></th>' : ''}</tr></thead><tbody>${list.map((x) => `<tr><td>${View.soLink(x.so.no)}<p class="text-xs text-slate-500">${esc(DB.client(x.so.clientCode).name)}</p></td><td>${x.no}. ${esc(x.label)} (${x.pct}%)</td><td class="text-sm">${esc(x.triggerText)}</td><td class="r">${rp(x.amount)}</td>${canCreate ? `<td class="r"><button type="button" class="btn btn-secondary btn-sm" data-pick="${esc(x.so.no)}|${x.no}">${icon('upload', 'w-3.5 h-3.5')}Upload</button></td>` : ''}</tr>`).join('')}</tbody></table>`
+        : UI.emptyState({ icon: 'checkCircle', title: 'Semua termin milestone sudah ada BAST-nya' });
+      document.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { const [s, n] = b.dataset.pick.split('|'); openUpload(s, n); }));
+    }
+
+    const rows = () => DB.all('bast').map((b) => {
+      const wd = Cal.workdaysBetween(b.date, b.receivedDate);
+      return Object.assign({}, b, { clientName: DB.client(DB.so(b.soNo).clientCode).name, late: wd > Cal.slaDays('kirimBast'), wd, byName: DB.user(b.by).name });
+    }).sort((a, b) => b.at.localeCompare(a.at));
+    const table = new UI.DataTable($('table'), {
+      data: rows(), pageSize: 10, searchPlaceholder: 'Cari no. dokumen, SO, client…', searchKeys: ['docNo', 'soNo', 'clientName', 'invoiceNo'],
+      filters: [{ key: 'docType', label: 'Jenis', options: ['BAST', 'BA Material Tiba', 'Laporan lain (ditandatangani kedua pihak)'] }],
+      columns: [
+        { key: 'docNo', label: 'Dokumen', render: (b) => `<p class="font-mono text-xs text-slate-900">${esc(b.docNo)}</p><p class="text-xs text-slate-500">${esc(b.docType)} · ${View.fileChip(b.file)}</p>` },
+        { key: 'soNo', label: 'SO · termin', render: (b) => `${View.soLink(b.soNo)}<p class="text-xs text-slate-500">${esc(b.clientName)} · termin ${b.term}</p>` },
+        { key: 'date', label: 'Tgl BAST', sortable: true, render: (b) => `<span class="num">${UI.formatDate(b.date)}</span>` },
+        { key: 'receivedDate', label: 'Diterima', sortable: true, render: (b) => `<span class="num">${UI.formatDate(b.receivedDate)}</span><p>${b.late ? UI.badge(`H+${b.wd} · lewat SLA`, { tone: 'red', icon: 'alert' }) : `<span class="text-xs text-slate-500">H+${b.wd} · tepat waktu</span>`}</p>` },
+        { key: 'invoiceNo', label: 'Invoice', render: (b) => (b.invoiceNo ? `${View.invLink(b.invoiceNo)}<p class="mt-1">${UI.badge(DB.invoice(b.invoiceNo).status)}</p>` : '—') },
+      ],
+    });
+
+    if (canCreate) {
+      const sos = DB.all('salesOrders').filter((s) => s.status === 'Aktif');
+      $('b-so').innerHTML = '<option value="">Pilih Sales Order…</option>' + sos.map((s) => `<option value="${esc(s.no)}">${esc(s.no)} — ${esc(DB.client(s.clientCode).name)}</option>`).join('');
+      window.fillTerms = function () {
+        const so = DB.so($('b-so').value);
+        const done = DB.all('bast').filter((b) => b.soNo === (so && so.no)).map((b) => b.term);
+        $('b-term').innerHTML = so ? Calc.terms(so).map((x) => `<option value="${x.no}" ${done.includes(x.no) || x.trigger === 'date' ? 'disabled' : ''}>${x.no}. ${esc(x.label)} — ${x.pct}% ${done.includes(x.no) ? '(sudah ada BAST)' : x.trigger === 'date' ? '(pemicu tanggal, tanpa BAST)' : ''}</option>`).join('') : '<option value="">Pilih SO dulu</option>';
+        const firstOk = $('b-term').querySelector('option:not([disabled])'); if (firstOk) $('b-term').value = firstOk.value;
+        termHint();
+      };
+      window.termHint = function () {
+        const so = DB.so($('b-so').value); const x = so && Calc.terms(so).find((t) => t.no === Number($('b-term').value));
+        $('term-hint').textContent = x ? `Pemicu: ${x.triggerText} · nominal ${rp(x.amount)}` : '';
+        if (x) $('b-type').value = /material/i.test(x.triggerText + x.label) ? 'BA Material Tiba' : 'BAST';
+      };
+      $('b-so').addEventListener('change', fillTerms); $('b-term').addEventListener('change', termHint);
+      $('b-recv').value = MOCK.today;
+      const dz = UI.dropzone($('dz'), { id: 'b-file', label: 'File BAST', required: true, accept: ['pdf', 'jpg', 'jpeg', 'png'], hint: 'PDF, JPG, PNG · maks. 10 MB' });
+      const late = () => {
+        const a = $('b-date').value; const b = $('b-recv').value; const el = $('late');
+        if (!a || !b || b < a) { el.className = 'hidden'; return; }
+        const wd = Cal.workdaysBetween(a, b);
+        el.className = wd > Cal.slaDays('kirimBast') ? 'flex gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 ring-1 ring-inset ring-amber-300' : 'hidden';
+        el.innerHTML = `${icon('alert', 'w-4 h-4')}BAST diterima H+${wd} hari kerja dari Lead Project (SLA maks. H+1). Akan ditandai di riwayat.`;
+      };
+      ['b-date', 'b-recv'].forEach((id) => $(id).addEventListener('change', late));
+      fillTerms();
+      $('open-upload').addEventListener('click', () => openUpload());
+      const qs = new URLSearchParams(location.search);
+      if (qs.get('so') && DB.so(qs.get('so'))) openUpload(qs.get('so'), qs.get('term'));
+
+      $('bast-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        if (!UI.validateRequired(f)) return;
+        if ($('b-recv').value < $('b-date').value) { UI.fieldError($('b-recv'), 'Tanggal diterima tidak boleh sebelum tanggal BAST'); return; }
+        if (!dz.files().length) { dz.error('File BAST wajib di-upload.'); return; }
+        const so = DB.so($('b-so').value); const term = Number($('b-term').value);
+        const x = Calc.terms(so).find((t) => t.no === term);
+        const existing = DB.all('invoices').find((i) => i.soNo === so.no && i.term === term);
+        const r = await UI.confirm({ title: 'Upload BAST?', message: existing ? `Invoice termin ${term} sudah ada (${existing.no}); BAST akan ditautkan sebagai lampiran.` : `Sistem akan membuat draft invoice termin ${term} (${x.label}) senilai ${rp(x.amount)}.`, confirmText: 'Upload' });
+        if (!r.confirmed) return;
+        const S = DB.settings();
+        const id = 'BAST-2026-' + String(Math.max(...DB.all('bast').map((b) => parseInt(b.id.slice(-4), 10))) + 1).padStart(4, '0');
+        let invNo = existing && existing.no;
+        if (!existing) {
+          invNo = DB.nextNo(S.numbering.invoice, DB.all('invoices').map((i) => i.no), MOCK.today);
+          const dueDays = (x.dueText.match(/(\d+)\s*hari/) || [0, 14])[1];
+          DB.insert('invoices', { no: invNo, rev: 0, soNo: so.no, term, date: MOCK.today, due: Cal.addDays(MOCK.today, Number(dueDays)), status: 'Draft', createdBy: ctx.user.id, bankId: S.banks.find((b) => b.isDefault).id, basis: id, history: [{ at: Cal.nowIso(), by: ctx.user.id, action: 'Draft dibuat dari BAST', note: '' }] });
+          DB.log({ action: 'Membuat draft invoice', docNo: invNo, module: 'Invoice', reason: `Dari ${$('b-type').value} ${$('b-no').value.trim()}` });
+        }
+        const wd = Cal.workdaysBetween($('b-date').value, $('b-recv').value);
+        DB.insert('bast', { id, soNo: so.no, term, docType: $('b-type').value, docNo: $('b-no').value.trim(), date: $('b-date').value, receivedDate: $('b-recv').value, file: dz.files()[0].name, by: ctx.user.id, at: Cal.nowIso(), invoiceNo: invNo });
+        DB.log({ action: 'Upload BAST', docNo: $('b-no').value.trim(), module: 'BAST', reason: wd > 1 ? `Diterima H+${wd} dari Lead Project.` : '' });
+        UI.toast(`BAST tersimpan. Draft invoice ${invNo} siap dilengkapi.`);
+        UI.closeModal(modal); f.reset(); dz.clear(); $('b-recv').value = MOCK.today; fillTerms(); late();
+        table.setData(rows()); renderWait();
+        setTimeout(() => { location.href = `invoice-detail.html?no=${encodeURIComponent(invNo)}`; }, 900);
+      });
+    }
+    renderWait();
+  </script>
+</body>
+</html>

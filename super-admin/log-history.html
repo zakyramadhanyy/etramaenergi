@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log History · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+  <style>.rng{height:32px;padding:0 14px;border-radius:10px;font-size:14px;font-weight:500;color:#64748B}.rng:hover{color:#0F172A}.rng[aria-pressed="true"]{background:#fff;color:#0F172A;font-weight:700;box-shadow:0 1px 2px rgba(15,23,42,.08)}</style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <!-- Periode + info read-only dalam satu baris; tabel berada di kartu standar. -->
+    <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      <form id="period" class="flex flex-wrap items-center gap-3" aria-label="Filter periode">
+        <div role="group" aria-label="Rentang cepat" class="inline-flex gap-1 rounded-xl bg-[#EEF1F6] p-1" id="ranges">
+          <button type="button" data-range="0" class="rng">Hari ini</button><button type="button" data-range="7" class="rng">7 hari</button><button type="button" data-range="30" class="rng">30 hari</button><button type="button" data-range="" class="rng" aria-pressed="true">Semua</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="sr-only" for="from">Dari tanggal</label><input id="from" type="date" class="input !mt-0 !w-40">
+          <span class="text-sm text-slate-400" aria-hidden="true">–</span>
+          <label class="sr-only" for="to">Sampai tanggal</label><input id="to" type="date" class="input !mt-0 !w-40">
+        </div>
+      </form>
+      <button type="button" class="btn btn-secondary" id="export"><span data-icon="download"></span>Export Excel</button>
+    </div>
+    <p class="-mt-2 inline-flex items-center gap-2 text-xs text-slate-500"><span data-icon="lock"></span>Read-only · tidak dapat diubah atau dihapus siapa pun, termasuk Super Admin. Riwayat per dokumen ada di tab Riwayat masing-masing dokumen.</p>
+    <div id="table"></div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'super-admin', active: 'log-history', title: 'Log History', breadcrumb: ['Super Admin', 'Log History'] });
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.dataset.icon); });
+    const { esc } = UI;
+    // Jenis entitas diturunkan dari pola nomor dokumen.
+    function entityOf(l) {
+      const d = String(l.docNo || '');
+      return /^SO\//.test(d) ? 'Sales Order' : /^INV\//.test(d) ? 'Invoice' : /^BAST|^BA/.test(d) ? 'BAST' : /^PO-|^PO\//.test(d) ? 'Purchase Order' : /^CL-/.test(d) ? 'Client' : /^VD-/.test(d) ? 'Vendor' : /^BD-/.test(d) ? 'Staf BD' : /^U-|@/.test(d) ? 'User' : /^R-/.test(d) ? 'Role' : l.module === 'Pembayaran Vendor' || l.module === 'Purchase Order' ? 'Invoice Vendor' : 'Lainnya';
+    }
+    const all = DB.all('logs').map((l, i) => {
+      const u = DB.user(l.userId);
+      const r = MOCK.roles[u.role];
+      return Object.assign({}, l, { i, entity: entityOf(l), userName: u.name, roleLabel: r ? (r.short || r.label) : 'Sistem', level: r ? r.level : '—', who: !r ? 'Sistem' : u.role === 'super_admin' ? 'Super Admin' : `Admin Finance · ${r.level}`, date: Cal.dateOf(l.at), changeText: l.changes.map((c) => `${c.field}: ${c.before} → ${c.after}`).join(' | ') });
+    });
+    const MOD = { 'Akun': 'gray', 'Invoice': 'blue', 'Approval': 'blue', 'Sales Order': 'orange', 'BAST': 'green', 'Master Data': 'violet', 'User Management': 'violet', 'Role Management': 'violet', 'Purchase Order': 'teal', 'Pembayaran Vendor': 'teal', 'Piutang': 'amber' };
+    const PILL = { gray: 'bg-slate-100 text-slate-700', blue: 'bg-blue-50 text-blue-700', orange: 'bg-orange-50 text-orange-700', green: 'bg-emerald-50 text-emerald-700', violet: 'bg-violet-50 text-violet-700', teal: 'bg-teal-50 text-teal-700', amber: 'bg-amber-50 text-amber-700' };
+    const DOT = { gray: 'bg-slate-400', blue: 'bg-blue-600', orange: 'bg-orange-500', green: 'bg-emerald-500', violet: 'bg-violet-500', teal: 'bg-teal-500', amber: 'bg-amber-500' };
+    const modPill = (m) => { const t = MOD[m] || 'gray'; return `<span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${PILL[t]}"><span class="h-1.5 w-1.5 rounded-full ${DOT[t]}"></span>${esc(m)}</span>`; };
+    const AV = ['bg-blue-100 text-blue-700', 'bg-pink-100 text-pink-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-violet-100 text-violet-700', 'bg-sky-100 text-sky-700'];
+    const avTone = (id) => AV[(parseInt(String(id).replace(/\D/g, ''), 10) || 0) % AV.length];
+    const ini = (n) => n.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const uniq = (k) => [...new Set(all.map((x) => x[k]))].sort((a, b) => a.localeCompare(b, 'id'));
+    const table = new UI.DataTable(document.getElementById('table'), {
+      data: all, pageSize: 25, searchPlaceholder: 'Cari no. dokumen, aksi, alasan…', searchKeys: ['docNo', 'action', 'reason', 'userName', 'changeText'],
+      filters: [{ key: 'userName', label: 'User', options: uniq('userName') }, { key: 'module', label: 'Modul', options: uniq('module') }, { key: 'entity', label: 'Jenis entitas', options: uniq('entity') }, { key: 'action', label: 'Aksi', options: uniq('action') }],
+      rowClass: () => 'cursor-pointer hover:bg-slate-50',
+      empty: { icon: 'history', title: 'Belum ada aktivitas pada periode ini' },
+      columns: [
+        { key: 'at', label: 'Kapan (WIB)', sortable: true, render: (l) => `<p class="t-main !font-medium num">${UI.formatDate(l.at)}</p><p class="t-sub num">${UI.formatTime(l.at)}</p>` },
+        { key: 'userName', label: 'Siapa', sortable: true, render: (l) => `<div class="flex items-center gap-3"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${avTone(l.userId)}">${esc(ini(l.userName))}</span><div><p class="t-main !font-medium">${esc(l.userName)}</p><p class="t-sub">${esc(l.who)}</p></div></div>` },
+        { key: 'action', label: 'Apa', render: (l) => `<p class="t-main !font-medium">${esc(l.action)}</p>${l.docNo && l.docNo !== '—' ? `<p class="t-doc">${esc(l.docNo)}</p>` : ''}` },
+        { key: 'module', label: 'Di mana', sortable: true, render: (l) => modPill(l.module) },
+        { key: 'reason', label: 'Kenapa', className: '!whitespace-normal min-w-[200px] max-w-[300px]', render: (l) => (l.reason ? `<span class="line-clamp-2 text-sm text-slate-700">${esc(l.reason)}</span>` : '<span class="text-slate-300">—</span>') },
+        { key: 'changes', label: 'Perubahan', align: 'right', render: (l) => `<span class="sr-only" data-log="${l.i}"></span>${l.changes.length ? `<span class="inline-flex items-center gap-1 whitespace-nowrap text-xs font-bold text-brand-blue">${l.changes.length} nilai berubah ${UI.icon('chevronRight', 'w-3.5 h-3.5')}</span>` : `<span class="text-slate-300">${UI.icon('chevronRight', 'w-4 h-4')}</span>`}` },
+      ],
+    });
+    // Klik baris → drawer detail perubahan (diff sebelum/sesudah). Read-only: tidak ada aksi edit/hapus.
+    document.getElementById('table').addEventListener('click', (e) => {
+      const k = e.target.closest('tr') && e.target.closest('tr').querySelector('[data-log]'); if (!k) return;
+      const l = all.find((x) => x.i === Number(k.dataset.log));
+      UI.drawer({
+        title: l.action, subtitle: `<span class="font-mono">${esc(l.docNo)}</span> · ${esc(l.module)}`,
+        body: `<dl class="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">${[['Siapa', `${esc(l.userName)}<span class="block text-xs font-normal text-slate-500">${esc(l.roleLabel)} · ${esc(l.level)}</span>`], ['Kapan', `${UI.formatDate(l.at)}, ${UI.formatTime(l.at)}`], ['Di mana', esc(l.module)], ['Jenis entitas', esc(l.entity)]].map(([a, v]) => `<div><dt class="text-xs text-slate-500">${a}</dt><dd class="mt-1 font-medium text-slate-900">${v}</dd></div>`).join('')}
+            <div class="col-span-2"><dt class="text-xs text-slate-500">Kenapa</dt><dd class="mt-1 text-slate-900">${l.reason ? esc(l.reason) : '—'}</dd></div></dl>
+          <h3 class="mt-6 text-sm font-semibold text-slate-900">Perubahan nilai</h3>
+          ${l.changes.length ? `<div class="mt-2 overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm"><thead class="bg-slate-50 text-xs text-slate-500"><tr><th class="px-4 py-2 text-left font-medium">Field</th><th class="px-4 py-2 text-left font-medium">Sebelum</th><th class="px-4 py-2 text-left font-medium">Sesudah</th></tr></thead><tbody>${l.changes.map((c) => `<tr class="border-t border-slate-100 align-top"><td class="px-4 py-2.5 text-slate-600">${esc(c.field)}</td><td class="px-4 py-2.5"><span class="rounded bg-red-50 px-1.5 py-0.5 text-red-700 line-through decoration-red-300">${esc(c.before)}</span></td><td class="px-4 py-2.5"><span class="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-800">${esc(c.after)}</span></td></tr>`).join('')}</tbody></table></div>` : '<p class="mt-1 text-sm text-slate-500">Aktivitas ini tidak mengubah nilai data.</p>'}
+          <p class="mt-6 flex items-center gap-2 text-xs text-slate-500">${UI.icon('lock', 'w-3.5 h-3.5')}Log read-only — tidak dapat diubah atau dihapus.</p>`,
+      });
+    });
+    const from = document.getElementById('from'); const to = document.getElementById('to');
+    const apply = () => table.setData(all.filter((l) => (!from.value || l.date >= from.value) && (!to.value || l.date <= to.value)));
+    [from, to].forEach((el) => el.addEventListener('change', () => { document.querySelectorAll('.rng').forEach((x) => x.setAttribute('aria-pressed', 'false')); apply(); }));
+    document.querySelectorAll('[data-range]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.range === '') { from.value = ''; to.value = ''; } else { to.value = MOCK.today; from.value = Cal.addDays(MOCK.today, -Number(b.dataset.range)); }
+      document.querySelectorAll('.rng').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      apply();
+    }));
+    document.getElementById('export').addEventListener('click', () => {
+      const rows = table.filtered();
+      UI.exportCsv(`log-history-${MOCK.today}`, [['Tanggal', 'Jam (WIB)', 'User', 'Role', 'Level', 'Aksi', 'No. dokumen', 'Modul', 'Alasan', 'Nilai sebelum → sesudah'],
+        ...rows.map((l) => [UI.formatDate(l.at), UI.formatTime(l.at), l.userName, l.roleLabel, l.level, l.action, l.docNo, l.module, l.reason, l.changeText])]);
+      DB.log({ action: 'Export log history', docNo: `${rows.length} baris`, module: 'Log History' });
+    });
+  </script>
+</body>
+</html>

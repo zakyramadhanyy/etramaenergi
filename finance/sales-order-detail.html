@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Detail Sales Order · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+  <style>
+    .dx { width: 100%; max-width: 1288px; margin-inline: auto; padding-inline: 1rem; }
+    @media (min-width: 640px) { .dx { padding-inline: 1.5rem; } }
+    .sd-card { background: #fff; border: 1px solid #E6EAF0; border-radius: 16px; }
+    .sd-tab { height: 36px; padding: 0 16px; border-radius: 10px; font-size: 14px; font-weight: 500; color: #475569; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
+    .sd-tab:hover { color: #0F172A; }
+    .sd-tab[aria-selected="true"] { background: #fff; color: #293173; font-weight: 700; box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
+    .sd-th { background: #F6F8FB; font-size: 12px; font-weight: 600; color: #475569; height: 44px; padding: 0 12px; white-space: nowrap; }
+    .sd-td { padding: 14px 12px; border-top: 1px solid #EEF1F5; vertical-align: top; }
+    .sd-th:first-child, .sd-td:first-child { padding-left: 24px; }
+    .sd-th:last-child, .sd-td:last-child { padding-right: 24px; }
+    .sd-btn-out { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid #E2E8F0; border-radius: 10px; background: #fff; font-size: 14px; font-weight: 600; color: #0F172A; }
+    .sd-btn-out:hover { background: #F8FAFC; }
+  </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <!-- ASUMSI: tampilan detail SO mengikuti mockup (header navy tanpa sidebar, tanggal ditulis "29 Okt 2026"). -->
+  <main id="page-content">
+    <section class="bg-brand-navy pb-[94px] pt-8 text-white">
+      <div class="dx flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2.5"><h1 id="so-title" class="text-2xl font-extrabold uppercase leading-tight tracking-tight sm:text-2xl"></h1><span id="so-badges" class="flex gap-2"></span></div>
+          <p id="so-sub" class="mt-2 text-sm text-blue-100/85"></p>
+        </div>
+        <div id="actions" class="flex flex-wrap items-center gap-2"></div>
+      </div>
+    </section>
+
+    <div class="dx -mt-16 space-y-6">
+      <section id="kpi" class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_12px_32px_-16px_rgba(15,23,42,0.25)]" aria-label="Ringkasan nilai"></section>
+      <div id="banners" class="space-y-3"></div>
+
+      <div role="tablist" aria-label="Detail Sales Order" id="tabs" class="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-[#E9EDF4] p-1"></div>
+
+      <div id="p-ringkasan" role="tabpanel" aria-labelledby="tab-ringkasan"></div>
+      <div id="p-top" role="tabpanel" aria-labelledby="tab-top" hidden></div>
+      <div id="p-invoice" role="tabpanel" aria-labelledby="tab-invoice" hidden></div>
+      <div id="p-dokumen" role="tabpanel" aria-labelledby="tab-dokumen" hidden></div>
+      <div id="p-riwayat" role="tabpanel" aria-labelledby="tab-riwayat" hidden></div>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'sales-order-list', title: 'Detail Sales Order', variant: 'detail', breadcrumb: ['Finance', 'Sales Order', 'Detail'], breadcrumbLinks: ['finance/dashboard.html', 'finance/sales-order-list.html'], perm: 'so' });
+    if (ctx.allowed) main();
+
+    function main() {
+    const { esc, formatRupiah: rp, icon } = UI;
+    const $ = (id) => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    const so = DB.so(params.get('no')) || DB.so('SO/ETR/2026/11/0001');
+    const client = DB.client(so.clientCode);
+    const bd = DB.bd(so.bdId);
+    const creator = DB.user(so.createdBy);
+    const t = Calc.soTotals(so);
+    const terms = Calc.terms(so);
+    const bill = Calc.soBilling(so);
+    const canCreate = Layout.can('so', 'buat');
+    const lateWd = Cal.workdaysBetween(so.approvedDate, so.receivedDate);
+    const enc = encodeURIComponent;
+    document.title = `${so.no} · ETrama Finance`;
+
+    /* ---------- Format tanggal ala mockup ---------- */
+    const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const d0 = (v) => { const [y, m, d] = String(v).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
+    const fd = (v) => { const d = d0(v); return `${d.getDate()} ${BLN[d.getMonth()]} ${d.getFullYear()}`; };
+    const fdLong = (v) => { const d = d0(v); return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`; };
+    const ftime = (iso) => UI.formatTime(iso);
+
+    /* ---------- Data turunan ---------- */
+    const invAll = DB.all('invoices').filter((i) => i.soNo === so.no);
+    const latestInv = (n) => invAll.filter((i) => i.term === n).sort((a, b) => (b.rev || 0) - (a.rev || 0))[0];
+    const bastAll = DB.all('bast').filter((b) => b.soNo === so.no);
+    const bastFor = (n) => bastAll.find((b) => b.term === n);
+    const invs = invAll.map(Calc.inv).sort((a, b) => a.term.no - b.term.no);
+    const isPaid = (x) => x.status === 'Terkirim' && Calc.paid(x, x.total) >= x.total;
+    const milestones = terms.filter((x) => x.trigger === 'milestone');
+    const bastMissing = milestones.filter((x) => !bastFor(x.no));
+    const TERM_COLORS = [
+      { bar: 'bg-blue-600', tile: 'bg-blue-50 text-blue-700' },
+      { bar: 'bg-violet-600', tile: 'bg-violet-50 text-violet-700' },
+      { bar: 'bg-amber-500', tile: 'bg-amber-50 text-amber-700' },
+      { bar: 'bg-emerald-600', tile: 'bg-emerald-50 text-emerald-700' },
+      { bar: 'bg-pink-500', tile: 'bg-pink-50 text-pink-700' },
+    ];
+    const tc = (i) => TERM_COLORS[i % TERM_COLORS.length];
+    const tile = (n, i) => `<span class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-xs font-[700] num ${tc(i).tile}">${n}</span>`;
+
+    /* ---------- Pill status ---------- */
+    const PILL = {
+      amber: 'bg-amber-50 text-amber-700', blue: 'bg-blue-50 text-blue-700', green: 'bg-emerald-50 text-emerald-700',
+      red: 'bg-red-50 text-red-600', gray: 'bg-slate-100 text-slate-600', violet: 'bg-violet-50 text-violet-700',
+    };
+    const DOT = { amber: 'bg-amber-500', blue: 'bg-blue-600', green: 'bg-emerald-500', red: 'bg-red-500', gray: 'bg-slate-400', violet: 'bg-violet-500' };
+    const pill = (text, tone, opt) => { const o = opt || {}; return `<span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-[700] ${PILL[tone]}">${o.icon ? icon(o.icon, 'w-3.5 h-3.5') : o.dot === false ? '' : `<span class="h-1.5 w-1.5 rounded-full ${DOT[tone]}"></span>`}${esc(text)}</span>`; };
+    const invTone = (x) => {
+      if (x.status === 'Terkirim') { const ar = Calc.arStatus(x); return ar === 'Paid' ? ['Lunas', 'green'] : ['Overdue', 'Dieskalasi'].includes(ar) ? ['Lewat jatuh tempo', 'red'] : ['Terkirim', 'blue']; }
+      return { 'Draft': ['Draft', 'amber'], 'Dikembalikan': ['Dikembalikan', 'red'], 'Disetujui': ['Disetujui', 'green'] }[x.status] || [x.status.replace('Review Manager', 'Review Manager'), 'blue'];
+    };
+    const slaPill = (s) => {
+      if (!s) return '<span class="text-slate-400">–</span>';
+      if (s.remaining < 0) return pill(`Lewat ${Math.abs(s.remaining)} hari kerja`, 'red', { icon: 'alert' });
+      if (s.remaining === 0) return pill('Batas hari ini', 'amber', { icon: 'clock' });
+      return pill(`Sisa ${s.remaining} hari kerja`, 'green', { icon: 'clock' });
+    };
+
+    /* ---------- Hero ---------- */
+    $('so-title').textContent = client.name;
+    const soTone = { 'Aktif': 'bg-emerald-400/15 text-emerald-300', 'Menunggu Approval': 'bg-amber-400/15 text-amber-200', 'Selesai': 'bg-white/15 text-white' }[so.status] || 'bg-white/15 text-white';
+    const soDot = { 'Aktif': 'bg-emerald-400', 'Menunggu Approval': 'bg-amber-300', 'Selesai': 'bg-white' }[so.status] || 'bg-white';
+    $('so-badges').innerHTML = `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-[700] ${soTone}"><span class="h-1.5 w-1.5 rounded-full ${soDot}"></span>${esc(so.status)}</span>`
+      + (so.status === 'Menunggu Approval' ? '' : `<span class="inline-flex items-center rounded-full bg-white/15 px-2.5 py-1 text-xs font-[700] text-white">${esc(bill.status)}</span>`);
+    $('so-sub').innerHTML = [`<span class="font-mono font-[700] text-white">${esc(so.no)}</span>`, esc(so.project), so.kwp ? `${so.kwp} kWp` : '', `<span class="font-mono">${esc(so.clientDocNo)}</span>`].filter(Boolean).join('<span class="mx-1.5 text-white/40">·</span>');
+    $('actions').innerHTML = (canCreate ? `
+      <span class="tip" tabindex="0" data-tip="Belum tersedia: revisi SO yang sudah dibuat belum didukung sistem"><button type="button" disabled aria-disabled="true" class="inline-flex h-10 cursor-not-allowed items-center rounded-[10px] border border-white/20 px-4 text-sm font-[700] text-white/50">Revisi SO</button></span>
+      ${bastMissing.length ? `<a href="bast.html?so=${enc(so.no)}&term=${bastMissing[0].no}" class="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#FBBF24] px-4 text-sm font-[700] text-brand-navy hover:bg-[#F5B301]">${icon('upload', 'w-4 h-4')}Upload BAST</a>` : ''}` : '') + `
+      <div class="relative">
+        <button type="button" id="more-btn" class="grid h-10 w-10 place-items-center rounded-[10px] border border-white/25 text-white hover:bg-white/10" aria-haspopup="true" aria-expanded="false" aria-label="Aksi lainnya">${icon('more', 'w-4 h-4')}</button>
+        <div id="more-menu" class="absolute right-0 top-12 z-30 hidden w-52 rounded-xl border border-slate-200 bg-white p-1.5 text-sm text-slate-700 shadow-lg">
+          <a href="sales-order-list.html" class="flex items-center gap-2 rounded-lg px-2.5 py-2 hover:bg-slate-50">${icon('fileText', 'w-4 h-4 text-slate-500')}Kembali ke daftar SO</a>
+          <a href="report-sales-order.html" class="flex items-center gap-2 rounded-lg px-2.5 py-2 hover:bg-slate-50">${icon('chart', 'w-4 h-4 text-slate-500')}Lihat di report</a>
+          <button type="button" id="copy-no" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-slate-50">${icon('clipboard', 'w-4 h-4 text-slate-500')}Salin no. SO</button>
+        </div>
+      </div>`;
+    const moreBtn = $('more-btn'); const moreMenu = $('more-menu');
+    moreBtn.addEventListener('click', (e) => { e.stopPropagation(); const open = moreMenu.classList.toggle('hidden') === false; moreBtn.setAttribute('aria-expanded', open); });
+    document.addEventListener('click', () => { moreMenu.classList.add('hidden'); moreBtn.setAttribute('aria-expanded', 'false'); });
+    $('copy-no').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(so.no); UI.toast(`${so.no} disalin.`, { title: 'Disalin' }); } catch (e) { UI.toast('Browser menolak akses clipboard.', { type: 'error', title: 'Gagal menyalin' }); }
+    });
+
+    /* ---------- KPI ---------- */
+    const pctB = t.total ? Math.round((bill.billed / t.total) * 100) : 0;
+    const pctP = t.total ? Math.round((bill.paid / t.total) * 100) : 0;
+    const rest = t.total - bill.billed;
+    function renderKpi(expanded) {
+      const cells = [
+        { ic: 'fileText', tint: 'bg-[#EEF2FF] text-brand-navy', label: 'Nilai kontrak', value: rp(t.total), cls: 'text-slate-900', sub: `Termasuk PPN ${t.rate}%` },
+        { ic: 'receipt', tint: 'bg-blue-50 text-blue-600', label: 'Sudah ditagih', value: rp(bill.billed), cls: 'text-slate-900', pct: pctB, sub: bill.billed ? `${pctB}% dari nilai kontrak` : `${pctB}% · belum ada invoice terkirim` },
+        { ic: 'checkCircle', tint: 'bg-emerald-50 text-emerald-600', label: 'Sudah dibayar', value: rp(bill.paid), cls: 'text-emerald-700', pct: pctP, sub: `${pctP}% dari nilai kontrak` },
+        { ic: 'clock', tint: 'bg-amber-50 text-amber-600', label: 'Sisa belum ditagih', value: rp(rest), cls: 'text-[#C2570C]', sub: `${100 - pctB}% dari nilai kontrak` },
+      ];
+      const grid = `<div class="grid grid-cols-2 divide-slate-100 lg:grid-cols-4 lg:divide-x">${cells.map((c) => expanded
+        ? `<div class="flex gap-3.5 p-5 sm:p-6">
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] ${c.tint}">${icon(c.ic, 'w-[18px] h-[18px]')}</span>
+            <div class="min-w-0"><p class="text-xs text-slate-500">${c.label}</p><p class="mt-1 text-xl font-extrabold leading-tight tracking-tight num sm:text-xl ${c.cls}">${c.value}</p><p class="mt-1.5 text-xs text-slate-500">${c.sub}</p></div>
+          </div>`
+        : `<div class="px-5 py-5 sm:px-6"><p class="text-xs text-slate-500">${c.label}</p><p class="mt-1 text-xl font-extrabold leading-tight tracking-tight num sm:text-xl ${c.cls}">${c.value}${c.pct != null ? ` <span class="text-xs font-medium text-slate-500">${c.pct}%</span>` : ''}</p></div>`).join('')}</div>`;
+      const bar = expanded ? `<div class="px-5 pb-5 sm:px-6">
+          <div class="flex h-1.5 overflow-hidden rounded-full bg-[#FDEFB8]" role="img" aria-label="Dibayar ${pctP}%, ditagih ${pctB}%, belum ditagih ${100 - pctB}%"><span class="bg-emerald-600" style="width:${pctP}%"></span><span class="bg-blue-600" style="width:${pctB - pctP}%"></span></div>
+          <div class="mt-3 flex flex-wrap gap-4 text-xs text-slate-600"><span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-sm bg-emerald-600"></span>Dibayar</span><span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-sm bg-blue-600"></span>Ditagih</span><span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-sm bg-[#FACC15]"></span>Belum ditagih</span></div>
+        </div>` : '';
+      $('kpi').innerHTML = grid + bar;
+    }
+
+    /* ---------- Banner (langkah berikutnya & peringatan) ---------- */
+    function nextStep() {
+      if (so.status === 'Menunggu Approval') return null;
+      const draft = invs.find((x) => x.status === 'Draft' || x.status === 'Dikembalikan');
+      if (draft) return { text: `${draft.status === 'Draft' ? 'lanjutkan draft' : 'perbaiki'} invoice termin ${draft.term.no} (${esc(draft.term.label)}) lalu ajukan review.`, link: ['Buka invoice', `invoice-detail.html?no=${enc(draft.no)}`] };
+      const ready = invs.find((x) => x.status === 'Disetujui');
+      if (ready) return { text: `kirim invoice termin ${ready.term.no} beserta form transmittal ke klien.`, link: ['Buka invoice', `invoice-detail.html?no=${enc(ready.no)}`] };
+      const m = bastMissing.find((x) => !latestInv(x.no));
+      if (m) return { text: `upload BAST agar termin ${m.no} (${esc(m.label)}) bisa ditagih.`, link: ['Lihat ToP', '#top'] };
+      return null;
+    }
+    const banners = [];
+    if (params.has('saved')) banners.push(['green', 'checkCircle', `<b class="font-[700]">${esc(so.no)} tersimpan.</b> Jadwal invoice dibentuk untuk ${so.top.length} termin.`]);
+    if (so.status === 'Menunggu Approval') banners.push(['blue', 'clock', '<b class="font-[700]">Menunggu approval SO.</b> Invoice belum dapat dibuat sampai SO disetujui.']);
+    if (lateWd > Cal.slaDays('kirimDokumen')) banners.push(['amber', 'alert', `<b class="font-[700]">Dokumen terlambat:</b> diterima dari Staf BD H+${lateWd} hari kerja setelah disetujui klien (SLA maks. H+1).`]);
+    if (client.status === 'Nonaktif') banners.push(['gray', 'info', `Client ${esc(client.name)} sudah nonaktif. Transaksi lama tetap menampilkan data ini.`]);
+    const ns = nextStep();
+    const BAN = { amber: ['border-amber-200 bg-[#FFFBEB] text-amber-900', 'bg-amber-100 text-amber-600', 'text-amber-800'], green: ['border-emerald-200 bg-emerald-50 text-emerald-900', 'bg-emerald-100 text-emerald-600', ''], blue: ['border-blue-200 bg-blue-50 text-blue-900', 'bg-blue-100 text-blue-600', ''], gray: ['border-slate-200 bg-white text-slate-700', 'bg-slate-100 text-slate-500', ''] };
+    const banner = (tone, ic, html, link) => `<div class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${BAN[tone][0]}"><span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg ${BAN[tone][1]}">${icon(ic, 'w-4 h-4')}</span><p class="min-w-0 flex-1">${html}</p>${link ? `<a href="${link[1]}" data-banner-link class="shrink-0 font-[700] ${BAN[tone][2]} hover:underline">${link[0]} →</a>` : ''}</div>`;
+    function renderBanners(tab) {
+      const list = banners.map((b) => banner(...b));
+      if (tab === 'ringkasan' && ns) list.push(banner('amber', 'alert', `<b class="font-[700]">Langkah berikutnya:</b> ${ns.text}`, ns.link));
+      $('banners').innerHTML = list.join('');
+      $('banners').hidden = !list.length;
+      const bl = document.querySelector('[data-banner-link][href="#top"]');
+      if (bl) bl.addEventListener('click', (e) => { e.preventDefault(); selectTab('top'); });
+    }
+
+    /* ---------- Kartu & elemen umum ---------- */
+    const cardHead = (ic, tint, title, right) => `<div class="flex items-center gap-3 px-6 pb-4 pt-5"><span class="grid h-8 w-8 place-items-center rounded-lg ${tint}">${icon(ic, 'w-4 h-4')}</span><h2 class="flex-1 text-base font-[700] text-slate-900">${title}</h2>${right || ''}</div>`;
+    const initials = (n) => n.replace(/^(dr\.|Dr\.)\s*/, '').split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const avatar = (n, tint) => `<span class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-[700] ${tint}">${esc(initials(n))}</span>`;
+    const aiChip = '<span class="inline-flex h-5 items-center rounded-md bg-violet-100 px-1.5 text-2xs font-[700] text-violet-700">AI</span>';
+
+    /* ---------- Tab: Ringkasan ---------- */
+    function renderRingkasan() {
+      const info = [
+        ['Dokumen klien', `${esc(so.docType === 'Kontrak Kerja' ? 'Kontrak' : so.docType)} <span class="font-mono font-medium">${esc(so.clientDocNo)}</span>`],
+        ['Disetujui klien', fd(so.approvedDate)],
+        ['Kapasitas', so.kwp ? `<span class="inline-flex items-center gap-1.5"><span class="text-amber-500">${icon('sun', 'w-4 h-4')}</span>${so.kwp} kWp</span>` : '—'],
+        ['Klien · PIC', `${esc(client.name)}<span class="block font-medium text-slate-500">${esc(client.pic)}</span>`],
+        ['Lokasi instalasi', esc(so.location)],
+        ['Sumber ToP', so.topSource === 'Manual' ? 'Input manual Staf Finance' : `<span class="inline-flex items-center gap-2">${aiChip}dikonfirmasi Staf Finance</span>`],
+      ];
+      const steps = [
+        { done: true, title: `${so.docType === 'Kontrak Kerja' ? 'Kontrak' : so.docType} disetujui klien`, sub: `${fd(so.approvedDate)} · ${esc(client.pic)}` },
+        { done: true, title: 'Diterima dari Staf BD', sub: `${fd(so.receivedDate)} · ${esc(bd.name)}${lateWd > Cal.slaDays('kirimDokumen') ? ' · <span class="font-[700] text-amber-700">terlambat</span>' : ''}` },
+        { done: true, title: 'SO dibuat', sub: `${fd(so.createdAt)}, ${ftime(so.createdAt)} · ${esc(creator.name)}` },
+      ];
+      if (milestones.length) steps.push(bastMissing.length
+        ? { done: false, title: 'Upload BAST', sub: 'Menunggu · syarat penagihan termin' }
+        : { done: true, title: 'BAST diterima', sub: `${bastAll.length} dokumen · semua termin milestone` });
+      $('p-ringkasan').innerHTML = `<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div class="space-y-6">
+          <section class="sd-card">${cardHead('info', 'bg-[#EEF2FF] text-brand-navy', 'Informasi kontrak')}
+            <dl class="grid gap-x-8 gap-y-5 px-6 pb-6 text-sm sm:grid-cols-2 xl:grid-cols-3">${info.map(([k, v]) => `<div><dt class="text-xs text-slate-500">${k}</dt><dd class="mt-1.5 font-[600] text-slate-900">${v}</dd></div>`).join('')}</dl>
+          </section>
+          <section class="sd-card overflow-hidden">${cardHead('table', 'bg-amber-50 text-amber-600', 'Item pekerjaan', `<span class="text-xs text-slate-500">${t.lines.length} item</span>`)}
+            <div class="overflow-x-auto"><table class="w-full min-w-[640px] text-sm">
+              <thead><tr><th class="sd-th text-left">Item</th><th class="sd-th text-right">Qty</th><th class="sd-th text-right">Harga satuan</th><th class="sd-th text-right">Diskon</th><th class="sd-th text-right">Subtotal</th></tr></thead>
+              <tbody>${t.lines.map((l) => `<tr><td class="sd-td text-slate-900">${esc(l.desc)}</td><td class="sd-td whitespace-nowrap text-right num">${UI.formatNumber(l.qty)} <span class="text-slate-500">${esc(l.unit)}</span></td><td class="sd-td whitespace-nowrap text-right num">${rp(l.price)}</td><td class="sd-td whitespace-nowrap text-right">${l.disc ? `<span class="rounded-md bg-red-50 px-2 py-0.5 text-red-600 num">−${rp(l.disc)}</span>` : '<span class="text-slate-400">–</span>'}</td><td class="sd-td whitespace-nowrap text-right font-[600] text-slate-900 num">${rp(l.subtotal)}</td></tr>`).join('')}</tbody>
+            </table></div>
+            <div class="flex justify-end border-t border-[#EEF1F5] px-6 py-5">
+              <dl class="w-full max-w-[340px] space-y-2.5 text-sm">
+                <div class="flex justify-between px-3.5"><dt class="text-slate-600">DPP</dt><dd class="font-medium num">${rp(t.dpp)}</dd></div>
+                <div class="flex justify-between px-3.5"><dt class="text-slate-600">PPN ${t.rate}%</dt><dd class="font-medium num">${rp(t.ppn)}</dd></div>
+                <div class="flex items-center justify-between rounded-xl bg-[#EEF3FF] px-3.5 py-3"><dt class="font-[700] text-brand-navy">Total kontrak</dt><dd class="text-lg font-extrabold text-brand-navy num">${rp(t.total)}</dd></div>
+              </dl>
+            </div>
+          </section>
+        </div>
+        <aside class="space-y-6">
+          <section class="sd-card p-6"><h2 class="text-base font-[700] text-slate-900">Alur dokumen</h2>
+            <ol class="mt-4">${steps.map((s, i) => { const next = steps[i + 1]; return `<li class="relative flex gap-3 pb-5 last:pb-0">
+              ${next ? `<span class="absolute left-[9px] top-6 h-[calc(100%-20px)] w-px ${next.done ? 'bg-emerald-200' : 'bg-amber-200'}" aria-hidden="true"></span>` : ''}
+              ${s.done ? `<span class="relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600">${icon('check', 'w-3 h-3')}</span>` : '<span class="relative h-5 w-5 shrink-0 rounded-full border-2 border-amber-400 bg-amber-50"></span>'}
+              <div class="min-w-0 -mt-0.5"><p class="text-sm font-[600] ${s.done ? 'text-slate-900' : 'text-amber-700'}">${s.title}</p><p class="mt-0.5 text-xs text-slate-500">${s.sub}</p></div>
+              <span class="sr-only">${s.done ? 'selesai' : 'menunggu'}</span></li>`; }).join('')}</ol>
+          </section>
+          <section class="sd-card p-6"><h2 class="text-base font-[700] text-slate-900">Kontak</h2>
+            <ul class="mt-4 space-y-4">${[[client.pic, `PIC Klien · ${client.name}`, 'bg-sky-50 text-sky-700'], [bd.name, 'Staf BD', 'bg-pink-50 text-pink-700'], [creator.name, `${MOCK.roles[creator.role].short || MOCK.roles[creator.role].label} · pembuat SO`, 'bg-violet-50 text-violet-700']].map(([n, r, tint]) => `<li class="flex items-center gap-3">${avatar(n, tint)}<div class="min-w-0"><p class="truncate text-sm font-[600] text-slate-900">${esc(n)}</p><p class="truncate text-xs text-slate-500">${esc(r)}</p></div></li>`).join('')}</ul>
+          </section>
+        </aside>
+      </div>`;
+    }
+
+    /* ---------- Tab: ToP ---------- */
+    function termStatus(x) {
+      const inv = latestInv(x.no);
+      if (inv) {
+        const d = Calc.inv(inv); const [label, tone] = invTone(d);
+        return `${pill(label === 'Draft' ? 'Invoice draft' : label, tone)}<a href="invoice-detail.html?no=${enc(inv.no)}" class="mt-1.5 block font-mono text-xs text-brand-blue hover:underline">${esc(d.label)}</a>`;
+      }
+      if (so.status === 'Menunggu Approval') return pill('Menunggu approval SO', 'gray', { icon: 'clock' });
+      if (x.trigger === 'milestone') return bastFor(x.no) ? pill('Siap ditagih', 'green', { icon: 'check' }) : pill('Menunggu BAST / BA', 'gray', { icon: 'clock' });
+      return pill('Siap ditagih', 'green', { icon: 'check' });
+    }
+    function renderTop() {
+      const sumPct = Calc.sum(terms, (x) => x.pct); const sumAmt = Calc.sum(terms, (x) => x.amount);
+      const ok = sumPct === 100 && sumAmt === t.total;
+      $('p-top').innerHTML = `<section class="sd-card overflow-hidden">
+        <div class="flex flex-wrap items-start justify-between gap-3 px-6 pt-5">
+          <div><h2 class="text-base font-[700] text-slate-900">Termin pembayaran</h2>
+            <p class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">${terms.length} termin · ${so.topSource === 'Manual' ? 'diinput manual oleh Staf Finance' : `disusun oleh ${aiChip} dan dikonfirmasi Staf Finance`}</p></div>
+          ${canCreate ? `<span class="tip" tabindex="0" data-tip="Belum tersedia: ToP mengikuti revisi SO yang belum didukung sistem"><button type="button" disabled aria-disabled="true" class="sd-btn-out cursor-not-allowed opacity-50">${icon('pencil', 'w-4 h-4')}Ubah ToP</button></span>` : ''}
+        </div>
+        <div class="px-6 pb-5 pt-5">
+          <div class="flex h-2 gap-1" role="img" aria-label="${terms.map((x) => `${x.label} ${x.pct}%`).join(', ')}">${terms.map((x, i) => `<span class="rounded-full ${tc(i).bar}" style="width:${x.pct}%"></span>`).join('')}</div>
+          <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">${terms.map((x, i) => `<span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-sm ${tc(i).bar}"></span>${esc(x.label)} · ${x.pct}%</span>`).join('')}</div>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full min-w-[860px] text-sm">
+          <thead><tr><th class="sd-th text-left">Termin</th><th class="sd-th text-right">Nominal</th><th class="sd-th text-left">Pemicu</th><th class="sd-th text-left">Jatuh tempo</th><th class="sd-th text-left">Retensi</th><th class="sd-th text-left">Status</th></tr></thead>
+          <tbody>${terms.map((x, i) => `<tr>
+            <td class="sd-td"><div class="flex gap-3">${tile(x.no, i)}<div><p class="font-[700] text-slate-900">${esc(x.label)}</p><p class="mt-0.5 text-xs text-slate-500">${x.pct}% dari kontrak</p></div></div></td>
+            <td class="sd-td whitespace-nowrap text-right font-[600] text-slate-900 num">${rp(x.amount)}</td>
+            <td class="sd-td max-w-[300px]">${x.trigger === 'date' ? pill('Tanggal', 'blue', { icon: 'calendar' }) : pill('Milestone', 'violet', { icon: 'flag' })}<p class="mt-2 text-slate-600">${esc(x.triggerText)}</p></td>
+            <td class="sd-td max-w-[160px] text-slate-700">${esc(x.dueText)}</td>
+            <td class="sd-td text-slate-500">${esc(x.retention || '–')}</td>
+            <td class="sd-td">${termStatus(x)}</td></tr>`).join('')}</tbody>
+          <tfoot><tr class="bg-[#EEF3FF]"><td class="px-6 py-3.5 font-extrabold text-brand-navy num">Total · ${sumPct}%</td><td class="px-3 py-3.5 text-right font-extrabold text-brand-navy num">${rp(sumAmt)}</td><td colspan="4" class="px-3 py-3.5 text-xs ${ok ? 'text-blue-700' : 'font-[700] text-red-600'}">${ok ? `${icon('check', 'inline w-3.5 h-3.5 -mt-0.5 mr-1')}Sesuai nilai kontrak` : `${icon('alert', 'inline w-3.5 h-3.5 -mt-0.5 mr-1')}Tidak sesuai nilai kontrak (${rp(t.total)})`}</td></tr></tfoot>
+        </table></div>
+      </section>`;
+    }
+
+    /* ---------- Tab: Invoice ---------- */
+    const pend = Calc.pendingTerms().filter((x) => x.so.no === so.no);
+    function renderInvoice() {
+      const counts = [
+        ['Draft', 'amber', invs.filter((x) => x.status === 'Draft' || x.status === 'Dikembalikan').length],
+        ['Terkirim', 'blue', invs.filter((x) => x.status === 'Terkirim' && !isPaid(x)).length],
+        ['Lunas', 'green', invs.filter(isPaid).length],
+        ['Lewat jatuh tempo', 'red', invs.filter((x) => x.status === 'Terkirim' && ['Overdue', 'Dieskalasi'].includes(Calc.arStatus(x))).length],
+      ];
+      const hl = { amber: 'border-amber-300 bg-[#FFFDF5]', red: 'border-red-200 bg-[#FFF8F8]' };
+      const unbilled = terms.filter((x) => !latestInv(x.no));
+      $('p-invoice').innerHTML = `<div class="space-y-6">
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">${counts.map(([l, tone, n]) => `<div class="flex h-14 items-center gap-3 rounded-xl border bg-white px-5 ${n && hl[tone] ? hl[tone] : 'border-[#E6EAF0]'}"><span class="h-2.5 w-2.5 rounded-full ${DOT[tone]}"></span><span class="flex-1 text-sm text-slate-700">${l}</span><span class="text-lg font-extrabold text-slate-900 num">${n}</span></div>`).join('')}</div>
+        <section class="sd-card overflow-hidden">
+          <div class="flex items-center justify-between gap-3 px-6 py-5"><h2 class="text-base font-[700] text-slate-900">Invoice</h2>${canCreate && so.status === 'Aktif' ? `<button type="button" id="make-inv" class="sd-btn-out">${icon('plus', 'w-4 h-4')}Buat invoice</button>` : ''}</div>
+          ${invs.length ? `<div class="overflow-x-auto"><table class="w-full min-w-[900px] text-sm">
+            <thead><tr><th class="sd-th text-left">No. invoice</th><th class="sd-th text-left">Termin</th><th class="sd-th text-left">Tanggal · jatuh tempo</th><th class="sd-th text-right">Total</th><th class="sd-th text-left">Status</th><th class="sd-th text-left">SLA</th><th class="sd-th"><span class="sr-only">Aksi</span></th></tr></thead>
+            <tbody>${invs.map((x) => { const [label, tone] = invTone(x); const draft = x.status === 'Draft' || x.status === 'Dikembalikan'; const href = `invoice-detail.html?no=${enc(x.no)}`; return `<tr class="${draft ? 'bg-[#FFFCF2]' : ''}">
+              <td class="sd-td align-middle"><a href="${href}" class="font-mono text-xs text-brand-blue hover:underline">${esc(x.label)}</a></td>
+              <td class="sd-td align-middle"><div class="flex items-center gap-2.5">${tile(x.term.no, x.term.no - 1)}<span class="font-medium text-slate-900">${esc(x.term.label)}</span><span class="text-slate-500">· ${x.term.pct}%</span></div></td>
+              <td class="sd-td align-middle"><p class="text-slate-900">${fd(x.date)}</p><p class="mt-0.5 text-xs text-slate-500">JT ${fd(x.due)}</p></td>
+              <td class="sd-td whitespace-nowrap text-right align-middle font-[700] text-slate-900 num">${rp(x.total)}</td>
+              <td class="sd-td align-middle">${pill(label, tone)}</td>
+              <td class="sd-td align-middle">${slaPill(Calc.invoiceSla(x))}</td>
+              <td class="sd-td align-middle"><div class="flex justify-end gap-2">${draft && canCreate ? `<a href="${href}" class="inline-flex h-9 items-center rounded-[10px] bg-brand-navy px-3.5 text-sm font-[700] text-white hover:bg-brand-navy-hover">${x.status === 'Draft' ? 'Lanjutkan draft' : 'Perbaiki'}</a>` : `<a href="${href}" class="sd-btn-out">Lihat</a>`}
+                <a href="${href}#riwayat" class="grid h-9 w-9 place-items-center rounded-[10px] border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" aria-label="Riwayat ${esc(x.label)}" title="Riwayat">${icon('more', 'w-4 h-4')}</a></div></td></tr>`; }).join('')}</tbody>
+          </table></div>` : `<div class="border-t border-[#EEF1F5] px-6 py-10 text-center"><p class="text-sm font-[600] text-slate-900">Belum ada invoice</p><p class="mt-1 text-sm text-slate-500">Invoice terbentuk dari jadwal termin (pemicu tanggal) atau setelah BAST di-upload (pemicu milestone).</p></div>`}
+        </section>
+        ${unbilled.length ? `<section class="sd-card p-6"><h2 class="text-base font-[700] text-slate-900">Belum bisa ditagih</h2><p class="mt-1 text-sm text-slate-500">Invoice dibuat otomatis begitu pemicu termin terpenuhi.</p>
+          <ul class="mt-4 space-y-2.5">${unbilled.map((x) => { const i = terms.indexOf(x); const st = so.status !== 'Aktif' ? pill('Menunggu approval SO', 'gray', { dot: false }) : x.trigger === 'milestone' && !bastFor(x.no) ? pill('Menunggu BAST / BA', 'gray', { dot: false }) : pill('Siap ditagih', 'green', { dot: false }); return `<li class="flex flex-wrap items-center gap-3 rounded-xl border border-[#EEF1F5] px-4 py-3">${tile(x.no, i)}<p class="text-sm"><span class="font-[700] text-slate-900">${esc(x.label)}</span> <span class="text-slate-500">· ${x.pct}%</span></p><p class="min-w-0 flex-1 text-sm text-slate-500">Pemicu: ${esc(/^[A-Z]{2}/.test(x.triggerText) ? x.triggerText : x.triggerText.charAt(0).toLowerCase() + x.triggerText.slice(1))}</p><p class="font-[700] text-slate-900 num">${rp(x.amount)}</p>${st}</li>`; }).join('')}</ul>
+        </section>` : ''}
+      </div>`;
+      const mk = $('make-inv');
+      if (mk) mk.addEventListener('click', () => {
+        if (!pend.length) { UI.toast('Belum ada termin yang pemicunya terpenuhi. Termin milestone menunggu BAST / BA.', { type: 'info', title: 'Belum bisa membuat invoice' }); return; }
+        const S = DB.settings(); const x = pend[0];
+        const no = DB.nextNo(S.numbering.invoice, DB.all('invoices').map((i) => i.no), MOCK.today);
+        DB.insert('invoices', { no, rev: 0, soNo: so.no, term: x.no, date: MOCK.today, due: Cal.addDays(MOCK.today, 14), status: 'Draft', createdBy: ctx.user.id, bankId: S.banks.find((b) => b.isDefault).id, history: [{ at: Cal.nowIso(), by: ctx.user.id, action: 'Draft dibuat dari jadwal termin', note: '' }] });
+        DB.log({ action: 'Membuat draft invoice', docNo: no, module: 'Invoice', reason: `Termin ${x.no} ${so.no}` });
+        location.href = `invoice-detail.html?no=${enc(no)}`;
+      });
+    }
+
+    /* ---------- Tab: Dokumen ---------- */
+    const guarantee = so.guarantee.slice();
+    function fileRow(name, sub) {
+      const ext = (name.split('.').pop() || '').toUpperCase();
+      const tint = ext === 'PDF' ? 'bg-red-50 text-red-600' : ['JPG', 'JPEG', 'PNG'].includes(ext) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700';
+      return `<div class="flex items-center gap-3 rounded-xl border border-[#EEF1F5] bg-[#FAFBFD] p-3">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-md text-2xs font-extrabold ${tint}">${esc(ext.slice(0, 4))}</span>
+        <div class="min-w-0 flex-1"><p class="truncate text-sm font-[600] text-slate-900">${esc(name)}</p>${sub ? `<p class="truncate font-mono text-xs text-slate-500">${esc(sub)}</p>` : ''}</div>
+        <button type="button" data-file-act="Pratinjau" class="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-white" aria-label="Lihat ${esc(name)}">${icon('eye', 'w-4 h-4')}</button>
+        <button type="button" data-file-act="Unduh" class="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-white" aria-label="Unduh ${esc(name)}">${icon('download', 'w-4 h-4')}</button>
+      </div>`;
+    }
+    function renderDokumen() {
+      const bastNeed = milestones.length > 0;
+      const bastDone = bastNeed && !bastMissing.length;
+      const parts = [
+        { ok: so.files.length > 0, req: true },
+        { ok: guarantee.length > 0, req: false },
+        { ok: bastDone || !bastNeed, req: bastNeed },
+      ];
+      const filled = parts.filter((p) => p.ok).length;
+      const seg = (p) => p.ok ? 'bg-emerald-500' : p.req ? 'bg-amber-500' : 'bg-slate-200';
+      const status = (kind) => ({ lengkap: pill('Lengkap', 'green', { icon: 'check' }), opsional: pill('Opsional', 'gray', { dot: false }), butuh: pill('Dibutuhkan', 'amber', { dot: false }), sebagian: pill('Sebagian', 'amber', { dot: false }) }[kind]);
+      const docLabel = so.docType === 'Kontrak Kerja' ? 'Kontrak' : so.docType;
+      const head = (ic, tint, title, sub, badge) => `<div class="flex items-start gap-3"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg ${tint}">${icon(ic, 'w-4 h-4')}</span><div class="min-w-0 flex-1"><h2 class="text-base font-[700] text-slate-900">${title}</h2><p class="mt-0.5 text-xs text-slate-500">${sub}</p></div>${badge}</div>`;
+      const msNos = milestones.map((x) => x.no);
+      $('p-dokumen').innerHTML = `<div class="space-y-5">
+        <div class="flex flex-wrap items-center gap-3"><p class="text-sm font-[700] text-slate-900">Kelengkapan dokumen</p><span class="flex gap-1.5" aria-hidden="true">${parts.map((p) => `<span class="h-1.5 w-9 rounded-full ${seg(p)}"></span>`).join('')}</span><p class="text-sm text-slate-600">${filled} dari ${parts.length} terisi</p></div>
+        <div class="grid gap-5 lg:grid-cols-3">
+          <section class="sd-card p-5">${head('fileText', 'bg-[#EEF2FF] text-brand-navy', `Dokumen ${esc(docLabel)}`, so.docType === 'Kontrak Kerja' ? 'Kontrak kerja dari klien' : `${esc(so.docType)} dari klien`, status(so.files.length ? 'lengkap' : 'butuh'))}
+            <div class="mt-4 space-y-2.5">${so.files.map((f) => fileRow(f, so.clientDocNo)).join('')}</div></section>
+          <section class="sd-card p-5">${head('shield', 'bg-sky-50 text-sky-700', 'Dokumen jaminan', 'Bank Garansi / Asuransi / EAR', status(guarantee.length ? 'lengkap' : 'opsional'))}
+            <div class="mt-4 space-y-2.5">${guarantee.map((f) => fileRow(f, '')).join('')}
+              ${guarantee.length ? (canCreate ? `<button type="button" data-add-guarantee class="text-sm font-[700] text-brand-blue hover:underline">+ Tambah dokumen jaminan</button>` : '') : `<div class="flex items-center justify-between gap-3 rounded-xl border border-[#EEF1F5] px-4 py-3.5"><p class="text-sm text-slate-500">Tidak ada jaminan untuk SO ini</p>${canCreate ? '<button type="button" data-add-guarantee class="sd-btn-out !h-8 !px-3 text-xs">Tambah</button>' : ''}</div>`}
+              <input type="file" id="guarantee-input" class="hidden" accept=".pdf,.jpg,.jpeg,.png">
+            </div></section>
+          <section class="rounded-2xl border bg-white p-5 ${bastNeed && !bastDone ? 'border-amber-200' : 'border-[#E6EAF0]'}">${head('clipboard', 'bg-amber-50 text-amber-600', 'BAST &amp; berita acara', bastNeed ? `Syarat penagihan termin ${msNos.join(' & ')}` : 'Tidak ada termin milestone', !bastNeed ? status('opsional') : bastDone ? status('lengkap') : bastAll.length ? status('sebagian') : status('butuh'))}
+            <div class="mt-4 space-y-2.5">${bastAll.map((b) => fileRow(b.file, `${b.docType} · termin ${b.term} · ${fd(b.date)}`)).join('')}
+              ${bastNeed && !bastDone && canCreate ? `<a href="bast.html?so=${enc(so.no)}&term=${bastMissing[0].no}" class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-amber-300 bg-[#FFFCF2] px-4 py-5 text-center hover:bg-amber-50"><span class="text-amber-700">${icon('upload', 'w-5 h-5')}</span><span><span class="block text-sm font-[700] text-amber-800">Upload BAST / BA</span><span class="block text-xs text-amber-700">PDF atau JPG, seret file ke sini</span></span></a>` : ''}
+              ${bastNeed && !bastDone && !canCreate ? '<p class="rounded-xl border border-[#EEF1F5] px-4 py-3.5 text-sm text-slate-500">Menunggu Staf Finance mengunggah BAST / BA.</p>' : ''}
+            </div></section>
+        </div>
+      </div>`;
+      const gi = $('guarantee-input');
+      document.querySelectorAll('[data-add-guarantee]').forEach((b) => b.addEventListener('click', () => gi.click()));
+      gi.addEventListener('change', () => {
+        const f = gi.files[0]; if (!f) return;
+        if (f.size > 10 * 1024 * 1024) { UI.toast('Ukuran file maksimal 10 MB.', { type: 'error', title: 'File terlalu besar' }); return; }
+        guarantee.push(f.name);
+        DB.update('salesOrders', (x) => x.no === so.no, (x) => { x.guarantee = guarantee.slice(); });
+        DB.log({ action: 'Menambah dokumen jaminan', docNo: so.no, module: 'Sales Order', reason: f.name });
+        UI.toast(`${f.name} ditambahkan ke ${so.no}.`, { title: 'Dokumen jaminan' });
+        renderDokumen();
+      });
+    }
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-file-act]');
+      if (b) UI.toast('Di prototipe, file dokumen tidak tersedia untuk dibuka atau diunduh.', { type: 'info', title: `${b.dataset.fileAct} dokumen` });
+    });
+
+    /* ---------- Tab: Riwayat ---------- */
+    function historyItems() {
+      const items = [{ cat: 'so', at: so.createdAt, title: 'Membuat Sales Order', sub: `Dari ${esc(so.clientDocNo)} · nilai ${rp(t.total)}`, by: creator.name }];
+      View.docLogs(so.no).filter((l) => l.title !== 'Membuat Sales Order').forEach((l) => items.push({ cat: /jaminan|dokumen/i.test(l.title) ? 'dokumen' : 'so', at: l.at, title: esc(l.title), sub: l.note ? esc(l.note) : '', by: l.by }));
+      invs.forEach((x) => { const [label, tone] = invTone(x); x.history.forEach((h) => items.push({ cat: 'invoice', at: h.at, title: esc(h.action.replace(/^Draft dibuat/, 'Draft invoice dibuat')), sub: `<a href="invoice-detail.html?no=${enc(x.no)}" class="font-mono text-brand-blue hover:underline">${esc(x.label)}</a> ${pill(label, tone, { dot: false })} <span>Termin ${x.term.no} · ${esc(x.term.label)} ${x.term.pct}%</span>${h.note ? `<span class="block text-slate-500">“${esc(h.note)}”</span>` : ''}`, by: DB.user(h.by) ? DB.user(h.by).name : h.by })); });
+      bastAll.forEach((b) => items.push({ cat: 'dokumen', at: b.at, title: `Upload ${esc(b.docType)}`, sub: `${esc(b.file)} · termin ${b.term}`, by: DB.user(b.by) ? DB.user(b.by).name : '' }));
+      return items.sort((a, b) => b.at.localeCompare(a.at));
+    }
+    const CAT = { so: ['filePlus', 'bg-blue-50 text-blue-600'], invoice: ['receipt', 'bg-amber-50 text-amber-600'], dokumen: ['clipboard', 'bg-emerald-50 text-emerald-600'] };
+    let histFilter = 'semua';
+    function renderRiwayat() {
+      const all = historyItems();
+      const list = histFilter === 'semua' ? all : all.filter((x) => x.cat === histFilter);
+      const groups = [];
+      list.forEach((x) => { const k = x.at.slice(0, 10); const g = groups.find((y) => y.k === k); if (g) g.items.push(x); else groups.push({ k, items: [x] }); });
+      $('p-riwayat').innerHTML = `<section class="sd-card">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-6 pt-5"><h2 class="text-base font-[700] text-slate-900">Riwayat aktivitas</h2>
+          <div class="flex flex-wrap gap-2" role="group" aria-label="Filter riwayat">${[['semua', 'Semua'], ['so', 'Sales Order'], ['invoice', 'Invoice'], ['dokumen', 'Dokumen']].map(([k, l]) => `<button type="button" data-hist="${k}" aria-pressed="${k === histFilter}" class="h-8 rounded-full border px-3.5 text-sm ${k === histFilter ? 'border-brand-navy bg-brand-navy font-[700] text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}">${l}</button>`).join('')}</div></div>
+        <div class="px-6 pb-6 pt-4">${groups.length ? groups.map((g) => `<h3 class="mt-2 text-xs font-[700] uppercase tracking-[0.06em] text-slate-500 first:mt-0">${fdLong(g.k)}</h3>
+          <ol class="mt-3 mb-5 last:mb-0">${g.items.map((x, i) => `<li class="relative flex gap-4 pb-5 last:pb-0">
+            ${i < g.items.length - 1 ? '<span class="absolute left-4 top-10 h-[calc(100%-32px)] w-px bg-slate-200" aria-hidden="true"></span>' : ''}
+            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg ${CAT[x.cat][1]}">${icon(CAT[x.cat][0], 'w-4 h-4')}</span>
+            <div class="min-w-0 flex-1"><p class="text-sm font-[600] text-slate-900">${x.title}</p>${x.sub ? `<p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">${x.sub}</p>` : ''}</div>
+            <div class="shrink-0 text-right"><p class="text-sm font-[700] text-slate-900 num">${ftime(x.at)}</p><p class="mt-0.5 text-xs text-slate-500">${esc(x.by || '')}</p></div></li>`).join('')}</ol>`).join('')
+          : '<p class="py-8 text-center text-sm text-slate-500">Belum ada aktivitas untuk filter ini.</p>'}</div>
+      </section>`;
+      document.querySelectorAll('[data-hist]').forEach((b) => b.addEventListener('click', () => { histFilter = b.dataset.hist; renderRiwayat(); }));
+    }
+
+    /* ---------- Tab ---------- */
+    const TABS = [['ringkasan', 'Ringkasan', renderRingkasan], ['top', 'ToP', renderTop], ['invoice', 'Invoice', renderInvoice], ['dokumen', 'Dokumen', renderDokumen], ['riwayat', 'Riwayat', renderRiwayat]];
+    $('tabs').innerHTML = TABS.map(([k, l]) => `<button type="button" role="tab" id="tab-${k}" aria-controls="p-${k}" aria-selected="false" tabindex="-1" class="sd-tab" data-tab="${k}">${l}${k === 'invoice' ? `<span class="grid h-5 min-w-[20px] place-items-center rounded-full bg-[#DDE3EC] px-1.5 text-2xs font-[700] text-slate-600 num">${invs.length}</span>` : ''}</button>`).join('');
+    const rendered = new Set();
+    function selectTab(k, focus) {
+      TABS.forEach(([key, , fn]) => {
+        const on = key === k;
+        const b = $(`tab-${key}`); b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1;
+        $(`p-${key}`).hidden = !on;
+        if (on && !rendered.has(key)) { fn(); rendered.add(key); }
+        if (on && focus) b.focus();
+      });
+      renderKpi(k === 'ringkasan');
+      renderBanners(k);
+    }
+    $('tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) selectTab(b.dataset.tab); });
+    $('tabs').addEventListener('keydown', (e) => {
+      if (!['ArrowRight', 'ArrowLeft'].includes(e.key)) return;
+      const keys = TABS.map((x) => x[0]); const cur = keys.indexOf(document.activeElement.dataset.tab);
+      selectTab(keys[(cur + (e.key === 'ArrowRight' ? 1 : -1) + keys.length) % keys.length], true);
+    });
+    const start = (params.get('tab') || '').toLowerCase();
+    selectTab(TABS.some((x) => x[0] === start) ? start : 'ringkasan');
+    }
+  </script>
+</body>
+</html>

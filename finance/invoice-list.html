@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar Invoice · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div id="chips" class="flex flex-wrap gap-2" role="group" aria-label="Filter cepat status"></div>
+    <div id="table"></div>
+    <p class="text-xs text-slate-500">Invoice dibuat otomatis dari jadwal termin Sales Order (pemicu tanggal) atau setelah BAST di-upload (pemicu milestone).</p>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'finance', active: 'invoice', title: 'Daftar Invoice', breadcrumb: ['Finance', 'Invoice'], perm: 'invoice' });
+    const { esc, formatRupiah: rp } = UI;
+    const all = DB.all('invoices').map(Calc.inv).map((x) => {
+      const s = Calc.invoiceSla(x);
+      return Object.assign(x, { clientName: x.client.name, creatorName: x.creator.name, slaRem: s ? s.remaining : 99, sla: s, group: /^Review/.test(x.status) ? 'Dalam review' : x.status });
+    }).sort((a, b) => b.no.localeCompare(a.no));
+    const GROUPS = ['Semua', 'Draft', 'Dalam review', 'Dikembalikan', 'Disetujui', 'Terkirim'];
+    let group = 'Semua';
+    const table = new UI.DataTable(document.getElementById('table'), {
+      data: all, pageSize: 10, searchPlaceholder: 'Cari no. invoice, SO, client…', searchKeys: ['no', 'soNo', 'clientName', 'creatorName'],
+      filters: [{ key: 'status', label: 'Status', options: ['Draft', 'Review Lead F&A', 'Review Manager', 'Review Direktur', 'Disetujui', 'Dikembalikan', 'Terkirim', 'Dibatalkan'] }, { key: 'clientName', label: 'Client', options: [...new Set(all.map((x) => x.clientName))].sort() }],
+      actions: `<button type="button" id="export" class="btn btn-secondary">Export Excel</button>`,
+      empty: { icon: 'receipt', title: 'Belum ada invoice' },
+      columns: [
+        { key: 'no', label: 'No. invoice', sortable: true, render: (x) => `${View.invLink(x.no, x.label)}<p class="text-xs text-slate-500">Dibuat ${esc(x.creatorName)}</p>` },
+        { key: 'clientName', label: 'Client · SO', sortable: true, render: (x) => `<p class="font-medium text-slate-900">${esc(x.clientName)}</p><p class="font-mono text-xs text-slate-500">${esc(x.soNo)}</p>` },
+        { key: 'term', label: 'Termin', render: (x) => `${x.term.no}. ${esc(x.term.label)}<p class="text-xs text-slate-500">${x.term.pct}%</p>` },
+        { key: 'date', label: 'Tgl · jatuh tempo', sortable: true, render: (x) => `<span class="num">${UI.formatDate(x.date)}</span><p class="text-xs text-slate-500 num">JT ${UI.formatDate(x.due)}</p>` },
+        { key: 'total', label: 'Total tagihan', align: 'right', numeric: true, sortable: true, render: (x) => `<span class="font-medium text-slate-900">${rp(x.total)}</span>` },
+        { key: 'status', label: 'Status', render: (x) => UI.badge(x.status) + (x.status === 'Terkirim' ? `<p class="mt-1">${UI.badge(Calc.arStatus(x))}</p>` : '') },
+        { key: 'slaRem', label: 'SLA', sortable: true, className: '!whitespace-normal min-w-[140px] max-w-[170px]', render: (x) => (x.sla ? UI.slaBadge(x.sla.remaining, { label: x.sla.label }) : '<span class="text-slate-400">—</span>') },
+      ],
+    });
+    function chips() {
+      document.getElementById('chips').innerHTML = GROUPS.map((g) => {
+        const n = g === 'Semua' ? all.length : all.filter((x) => x.group === g).length;
+        const on = g === group;
+        return `<button type="button" data-g="${g}" aria-pressed="${on}" class="inline-flex items-center gap-2 h-9 rounded-[10px] border px-3 text-sm font-medium shadow-sm ${on ? 'border-slate-200 bg-slate-100 text-slate-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}">${g}<span class="rounded-md px-1.5 text-xs num ${on ? 'bg-white' : 'bg-slate-100'}">${n}</span></button>`;
+      }).join('');
+      document.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => { group = b.dataset.g; chips(); table.setData(group === 'Semua' ? all : all.filter((x) => x.group === group)); }));
+    }
+    chips();
+    document.getElementById('export').addEventListener('click', () => UI.exportCsv(`invoice-${MOCK.today}`, [['No. invoice', 'Revisi', 'Client', 'No. SO', 'Termin', '%', 'Tanggal', 'Jatuh tempo', 'DPP', 'PPN', 'Total', 'Status'], ...table.filtered().map((x) => [x.no, x.rev ? 'Rev.' + x.rev : '', x.clientName, x.soNo, x.term.label, x.term.pct, UI.formatDate(x.date), UI.formatDate(x.due), x.dpp, x.ppn, x.total, x.status])]));
+  </script>
+</body>
+</html>

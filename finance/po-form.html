@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tambah PO · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <form id="po-form" novalidate class="space-y-5">
+      <section class="card"><div class="card-head"><h2 class="card-title">Data PO</h2><div class="text-right"><p class="text-xs text-slate-500">ID internal</p><p id="po-id" class="font-mono text-sm font-semibold text-brand-navy"></p></div></div>
+        <div class="card-body grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div data-field><label class="label" for="f-proc">No. PO dari procurement <span class="req">*</span></label><input id="f-proc" class="input" required placeholder="mis. PRC/PO/2026/0150"></div>
+          <div data-field><label class="label" for="f-date">Tanggal PO <span class="req">*</span></label><input id="f-date" type="date" class="input" required></div>
+          <div data-field><label class="label" for="f-req">Diajukan oleh / divisi <span class="req">*</span></label><input id="f-req" class="input" required placeholder="mis. Agung Wicaksono · Procurement"></div>
+          <div data-field><label class="label" for="f-vendor">Vendor <span class="req">*</span></label><select id="f-vendor" class="input" required></select></div>
+          <div><label class="label" for="f-pic">PIC vendor</label><input id="f-pic" class="input" readonly placeholder="Terisi otomatis"></div>
+          <div><label class="label" for="f-so">Project / reference (tautkan ke SO)</label><select id="f-so" class="input"></select></div>
+          <div class="md:col-span-2"><label class="label" for="f-top">ToP vendor <span class="req">*</span></label><div class="mt-1.5 flex gap-2"><select id="f-toptype" class="input !mt-0 w-40" aria-label="Jenis ToP"><option>DP + pelunasan</option><option>Termin</option><option>Net X hari</option></select><input id="f-top" class="input !mt-0 flex-1" required placeholder="mis. DP 30%, pelunasan 70% net 30 hari"></div></div>
+          <div><label class="label" for="f-pph">PPh (jika ada, %)</label><select id="f-pph" class="input"><option value="0">Tidak ada</option><option value="2">PPh 23 — 2%</option><option value="4">PPh 4(2) — 4%</option></select></div>
+          <div class="md:col-span-2 xl:col-span-3" id="dz"></div>
+        </div></section>
+      <section class="card"><div class="card-head"><h2 class="card-title">Item</h2><button type="button" id="add" class="btn btn-secondary btn-sm">+ Tambah item</button></div>
+        <div class="overflow-x-auto"><table class="tbl tbl-compact min-w-[900px]"><thead><tr><th>Nama item</th><th>Spesifikasi</th><th class="!text-right">Qty</th><th>Satuan</th><th class="!text-right">Harga (Rp)</th><th class="!text-right">Diskon (Rp)</th><th class="!text-right">Subtotal</th><th></th></tr></thead><tbody id="items"></tbody></table></div>
+        <div class="flex justify-end border-t border-slate-200 px-5 py-4"><dl id="sum" class="w-full max-w-sm space-y-1.5 text-sm num"></dl></div></section>
+      <div class="flex justify-end gap-2"><a href="po-list.html" class="btn btn-secondary">Batal</a><button type="submit" class="btn btn-primary">Simpan PO</button></div>
+    </form>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'po-form', title: 'Tambah PO', breadcrumb: ['Finance', 'Purchase Order', 'Tambah'], perm: 'vendor', need: 'buat' });
+    if (ctx.allowed) main();
+    function main() {
+    const { esc, formatRupiah: rp } = UI;
+    const $ = (id) => document.getElementById(id);
+    const S = DB.settings();
+    const id = DB.nextNo(S.numbering.po.replace('{MM}/', ''), DB.all('purchaseOrders').map((p) => p.id), MOCK.today);
+    $('po-id').textContent = id; $('f-date').value = MOCK.today;
+    $('f-vendor').innerHTML = '<option value="">Pilih vendor…</option>' + DB.all('vendors').filter((v) => v.status === 'Aktif').map((v) => `<option value="${v.code}">${esc(v.name)}</option>`).join('');
+    $('f-vendor').addEventListener('change', () => { const v = DB.vendor($('f-vendor').value); $('f-pic').value = v ? v.pic : ''; });
+    $('f-so').innerHTML = '<option value="">— Tidak ditautkan —</option>' + DB.all('salesOrders').filter((s) => s.status === 'Aktif').map((s) => `<option value="${esc(s.no)}">${esc(s.no)} — ${esc(s.project)}</option>`).join('');
+    const dz = UI.dropzone($('dz'), { label: 'Upload file PO', required: true });
+    const items = [{ name: '', spec: '', qty: 1, unit: 'unit', price: 0, disc: 0 }];
+    const dig = (v) => Number(String(v).replace(/\D/g, '')) || 0;
+    const sub = (it) => Math.max(0, it.qty * it.price - it.disc);
+    function sums() {
+      const dpp = Calc.sum(items, sub); const ppn = Math.round(dpp * S.ppnRate / 100); const pph = Math.round(dpp * Number($('f-pph').value) / 100);
+      $('sum').innerHTML = `<div class="flex justify-between"><dt class="text-slate-600">DPP</dt><dd>${rp(dpp)}</dd></div><div class="flex justify-between"><dt class="text-slate-600">PPN ${S.ppnRate}%</dt><dd>${rp(ppn)}</dd></div>${pph ? `<div class="flex justify-between"><dt class="text-slate-600">PPh ${$('f-pph').value}%</dt><dd>-${rp(pph)}</dd></div>` : ''}<div class="flex justify-between border-t border-slate-200 pt-1.5 text-base font-semibold"><dt>Total PO</dt><dd class="text-brand-navy">${rp(dpp + ppn - pph)}</dd></div>`;
+    }
+    function render() {
+      $('items').innerHTML = items.map((it, i) => `<tr>
+        <td><input aria-label="Nama item ${i + 1}" data-i="${i}" data-f="name" class="input input-sm" value="${esc(it.name)}"></td><td><input aria-label="Spesifikasi item ${i + 1}" data-i="${i}" data-f="spec" class="input input-sm" value="${esc(it.spec)}"></td>
+        <td><input aria-label="Qty" data-i="${i}" data-f="qty" type="number" min="0" class="input input-sm w-20 text-right num" value="${it.qty}"></td><td><input aria-label="Satuan" data-i="${i}" data-f="unit" class="input input-sm w-20" value="${esc(it.unit)}"></td>
+        <td><input aria-label="Harga" data-i="${i}" data-f="price" data-m inputmode="numeric" class="input input-sm w-32 text-right num" value="${UI.formatNumber(it.price)}"></td><td><input aria-label="Diskon" data-i="${i}" data-f="disc" data-m inputmode="numeric" class="input input-sm w-28 text-right num" value="${UI.formatNumber(it.disc)}"></td>
+        <td class="r font-medium" id="sub-${i}">${rp(sub(it))}</td><td class="r"><button type="button" class="btn btn-ghost btn-sm btn-icon" data-rm="${i}" aria-label="Hapus item ${i + 1}" ${items.length === 1 ? 'disabled' : ''}>${UI.icon('x')}</button></td></tr>`).join('');
+      $('items').querySelectorAll('input').forEach((el) => el.addEventListener('input', () => { const it = items[el.dataset.i]; const f = el.dataset.f; it[f] = el.dataset.m !== undefined ? dig(el.value) : f === 'qty' ? Number(el.value) : el.value; $(`sub-${el.dataset.i}`).textContent = rp(sub(it)); sums(); }));
+      $('items').querySelectorAll('[data-m]').forEach((el) => el.addEventListener('blur', () => { el.value = UI.formatNumber(dig(el.value)); }));
+      $('items').querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { items.splice(Number(b.dataset.rm), 1); render(); }));
+      sums();
+    }
+    $('add').addEventListener('click', () => { items.push({ name: '', spec: '', qty: 1, unit: 'unit', price: 0, disc: 0 }); render(); });
+    $('f-pph').addEventListener('change', sums);
+    $('po-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!UI.validateRequired(e.target)) return;
+      if (DB.find('purchaseOrders', (p) => p.procNo.toLowerCase() === $('f-proc').value.trim().toLowerCase())) { UI.fieldError($('f-proc'), 'No. PO procurement sudah pernah diinput'); $('f-proc').focus(); return; }
+      if (!items.every((it) => it.name.trim() && it.qty > 0 && it.price > 0)) { UI.toast('Lengkapi nama, qty, dan harga setiap item.', { type: 'error' }); return; }
+      if (!dz.files().length) { dz.error('File PO wajib di-upload.'); return; }
+      const r = await UI.confirm({ title: `Simpan ${id}?`, message: `PO dari ${DB.vendor($('f-vendor').value).name} akan berstatus Open.`, confirmText: 'Simpan' });
+      if (!r.confirmed) return;
+      DB.insert('purchaseOrders', { id, procNo: $('f-proc').value.trim(), date: $('f-date').value, vendorCode: $('f-vendor').value, requestedBy: $('f-req').value.trim(), soNo: $('f-so').value || null, items: items.map((it) => [it.name.trim(), it.spec.trim(), it.qty, it.unit, it.price, it.disc]), pph: Number($('f-pph').value), top: `${$('f-toptype').value}: ${$('f-top').value.trim()}`, file: dz.files()[0].name, createdBy: ctx.user.id, createdAt: Cal.nowIso() });
+      DB.log({ action: 'Menambah PO', docNo: id, module: 'Purchase Order', reason: `PO procurement ${$('f-proc').value.trim()}` });
+      UI.toast(`${id} tersimpan.`);
+      setTimeout(() => { location.href = 'po-list.html'; }, 600);
+    });
+    render();
+    }
+  </script>
+</body>
+</html>

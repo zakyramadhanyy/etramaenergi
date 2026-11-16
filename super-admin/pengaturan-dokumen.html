@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pengaturan Dokumen · ETrama Super Admin</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div class="flex flex-wrap items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="note">
+      <span data-icon="info"></span><p class="flex-1"><b>Perubahan hanya berlaku untuk dokumen baru.</b> Invoice & form transmittal yang sudah terbit tidak berubah. Setiap perubahan tercatat di log history.</p>
+      <button type="button" id="save" class="btn btn-primary" disabled>Simpan perubahan</button>
+    </div>
+    <div class="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <section class="card self-start" data-tabs>
+        <div role="tablist" aria-label="Pengaturan dokumen" class="flex gap-5 overflow-x-auto border-b border-slate-200 px-5">
+          <button role="tab" id="t-kop" aria-controls="p-kop" aria-selected="true" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Kop & alamat</button>
+          <button role="tab" id="t-bank" aria-controls="p-bank" aria-selected="false" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Rekening bank</button>
+          <button role="tab" id="t-ttd" aria-controls="p-ttd" aria-selected="false" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Stempel & TTD</button>
+          <button role="tab" id="t-note" aria-controls="p-note" aria-selected="false" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Catatan & pajak</button>
+          <button role="tab" id="t-num" aria-controls="p-num" aria-selected="false" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Format nomor</button>
+        </div>
+        <div id="p-kop" role="tabpanel" aria-labelledby="t-kop" class="card-body grid gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2"><label class="label" for="c-name">Nama perusahaan</label><input id="c-name" data-k="company.name" class="input"></div>
+          <div class="sm:col-span-2"><label class="label" for="c-addr">Alamat</label><textarea id="c-addr" data-k="company.address" rows="2" class="input"></textarea></div>
+          <div><label class="label" for="c-npwp">NPWP</label><input id="c-npwp" data-k="company.npwp" class="input font-mono"></div>
+          <div><label class="label" for="c-phone">Telepon</label><input id="c-phone" data-k="company.phone" class="input"></div>
+          <div class="sm:col-span-2" id="logo-dz"></div>
+        </div>
+        <div id="p-bank" role="tabpanel" aria-labelledby="t-bank" class="card-body space-y-3" hidden>
+          <p class="text-sm text-slate-600">Rekening default terisi otomatis di invoice. Staf Finance dapat memilih rekening lain dari daftar ini, tetapi <b>tidak dapat mengetik nomor rekening bebas</b>.</p>
+          <ul id="banks" class="space-y-2"></ul>
+          <button type="button" id="add-bank" class="btn btn-secondary btn-sm">+ Tambah rekening</button>
+        </div>
+        <div id="p-ttd" role="tabpanel" aria-labelledby="t-ttd" class="card-body space-y-5" hidden>
+          <div class="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4"><div><p class="text-sm font-semibold text-slate-900">Bubuhkan stempel otomatis</p><p class="text-sm text-slate-600">Stempel & TTD hanya muncul di PDF setelah invoice <b>Disetujui</b>. Draft ditandai watermark "DRAFT".</p></div><span id="stamp-sw"></span></div>
+          <div id="stamp-dz"></div>
+          <fieldset class="grid gap-4 rounded-lg border border-slate-200 p-4 sm:grid-cols-2"><legend class="px-1 text-sm font-semibold text-slate-900">Penandatangan default invoice</legend>
+            <div><label class="label" for="s-inv-n">Nama</label><input id="s-inv-n" data-k="signers.invoice.name" class="input"></div>
+            <div><label class="label" for="s-inv-t">Jabatan</label><input id="s-inv-t" data-k="signers.invoice.title" class="input"></div>
+            <div class="sm:col-span-2" id="ttd-dz"></div>
+          </fieldset>
+          <fieldset class="grid gap-4 rounded-lg border border-slate-200 p-4 sm:grid-cols-2"><legend class="px-1 text-sm font-semibold text-slate-900">Penandatangan default form transmittal</legend>
+            <div><label class="label" for="s-tr-n">Nama</label><input id="s-tr-n" data-k="signers.transmittal.name" class="input"></div>
+            <div><label class="label" for="s-tr-t">Jabatan</label><input id="s-tr-t" data-k="signers.transmittal.title" class="input"></div>
+            <div class="sm:col-span-2" id="ttd-tr-dz"></div>
+          </fieldset>
+        </div>
+        <div id="p-note" role="tabpanel" aria-labelledby="t-note" class="card-body space-y-4" hidden>
+          <div><label class="label" for="n-terms">Syarat pembayaran default</label><textarea id="n-terms" data-k="paymentTerms" rows="3" class="input"></textarea></div>
+          <div><label class="label" for="n-foot">Catatan kaki</label><textarea id="n-foot" data-k="footer" rows="2" class="input"></textarea></div>
+          <div><label class="label" for="n-ppn">Tarif PPN (%)</label><input id="n-ppn" data-k="ppnRate" data-num type="number" min="0" max="20" step="0.5" class="input w-32 num"><p class="hint">Dipakai untuk menghitung PPN di Sales Order & invoice baru.</p></div>
+          <div><label class="label" for="n-ppn-from">Berlaku mulai</label><input id="n-ppn-from" data-k="ppnFrom" type="date" class="input w-48"><p class="hint">Dokumen bertanggal sebelum ini tetap memakai tarif lama.</p></div>
+        </div>
+        <div id="p-num" role="tabpanel" aria-labelledby="t-num" class="card-body space-y-4" hidden>
+          <p class="text-sm text-slate-600">Token: <code class="font-mono text-xs">{YYYY}</code> tahun, <code class="font-mono text-xs">{MM}</code> bulan, <code class="font-mono text-xs">{####}</code> nomor urut 4 digit, <code class="font-mono text-xs">{n}</code> nomor revisi.</p>
+          <div class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600"><span>Format nomor saat ini hanya dapat dilihat.</span><span id="num-edit"></span></div>
+          <div id="nums" class="grid gap-5 sm:grid-cols-2"></div>
+        </div>
+      </section>
+      <section class="space-y-3" aria-labelledby="pv-title">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="pv-title" class="text-sm font-semibold text-slate-900">Preview invoice (live)</h2>
+          <div class="inline-flex rounded-lg bg-slate-200 p-0.5 text-sm" role="group" aria-label="Mode preview">
+            <button type="button" data-mode="approved" class="rounded-md px-3 py-1 font-medium" aria-pressed="true">Disetujui</button>
+            <button type="button" data-mode="draft" class="rounded-md px-3 py-1 font-medium" aria-pressed="false">Draft</button>
+          </div>
+        </div>
+        <div id="preview" class="overflow-x-auto rounded-xl bg-slate-200/70 p-4"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'super-admin', active: 'pengaturan-dokumen', title: 'Pengaturan Dokumen', breadcrumb: ['Super Admin', 'Pengaturan Dokumen'] });
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.dataset.icon); });
+    const { esc } = UI;
+    let draft = JSON.parse(JSON.stringify(DB.settings()));
+    let mode = 'approved';
+    const get = (o, path) => path.split('.').reduce((a, k) => a[k], o);
+    const set = (o, path, v) => { const ks = path.split('.'); const last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; };
+    const sample = Calc.inv(DB.invoice('INV/ETR/2026/10/0044'));
+
+    document.querySelectorAll('[data-k]').forEach((el) => {
+      el.value = get(draft, el.dataset.k);
+      el.addEventListener('input', () => { set(draft, el.dataset.k, el.dataset.num !== undefined ? Number(el.value) : el.value); update(); });
+    });
+    UI.dropzone(document.getElementById('logo-dz'), { label: 'Logo / kop perusahaan', accept: ['png', 'jpg', 'svg'], maxMB: 2, hint: 'PNG, JPG, atau SVG · maks. 2 MB', onChange: (f) => { if (f.length) { draft.logoFile = f[0].name; update(); } } });
+    UI.dropzone(document.getElementById('stamp-dz'), { label: 'Stempel perusahaan', accept: ['png'], maxMB: 2, hint: 'PNG transparan · maks. 2 MB', onChange: (f) => { if (f.length) { draft.stampFile = f[0].name; update(); } } });
+    UI.dropzone(document.getElementById('ttd-tr-dz'), { label: 'Gambar tanda tangan (transmittal)', accept: ['png'], maxMB: 2, hint: 'PNG transparan · maks. 2 MB', onChange: (f) => { if (f.length) { draft.signTrFile = f[0].name; update(); } } });
+    UI.dropzone(document.getElementById('ttd-dz'), { label: 'Gambar tanda tangan', accept: ['png'], maxMB: 2, hint: 'PNG transparan · maks. 2 MB', onChange: (f) => { if (f.length) { draft.signFile = f[0].name; update(); } } });
+
+    function renderStampSwitch() {
+      document.getElementById('stamp-sw').innerHTML = UI.switchHtml('sw-stamp', draft.stamp, 'Bubuhkan stempel otomatis');
+      document.getElementById('sw-stamp').addEventListener('click', () => { draft.stamp = !draft.stamp; renderStampSwitch(); update(); });
+    }
+
+    function renderBanks() {
+      document.getElementById('banks').innerHTML = draft.banks.map((b, i) => `<li class="flex flex-wrap items-center gap-3 rounded-lg border ${b.isDefault ? 'border-brand-blue bg-brand-soft/50' : 'border-slate-200'} px-4 py-3">
+        <input type="radio" name="def-bank" id="def-${i}" class="h-4 w-4 text-brand-blue focus:ring-brand-blue" ${b.isDefault ? 'checked' : ''} data-def="${i}">
+        <label for="def-${i}" class="min-w-0 flex-1 cursor-pointer"><span class="block text-sm font-semibold text-slate-900">${esc(b.bank)} · <span class="font-mono">${esc(b.account)}</span></span><span class="block text-xs text-slate-500">a.n. ${esc(b.holder)}${b.isDefault ? ' · Default' : ''}</span></label>
+        ${b.isNew ? `<button type="button" class="btn btn-ghost btn-sm" data-ebank="${i}">Edit</button><button type="button" class="btn btn-ghost btn-sm text-red-600" data-dbank="${i}">Batal tambah</button>` : `${UI.disabledButton('Edit', 'Belum tersedia: ubah rekening tersimpan belum didukung sistem', 'btn btn-ghost btn-sm')}${UI.disabledButton('Hapus', 'Belum tersedia: hapus rekening belum didukung sistem', 'btn btn-ghost btn-sm')}`}
+      </li>`).join('');
+      document.querySelectorAll('[data-def]').forEach((r) => r.addEventListener('change', () => { draft.banks.forEach((b, i) => { b.isDefault = i === Number(r.dataset.def); }); renderBanks(); update(); }));
+      document.querySelectorAll('[data-dbank]').forEach((b) => b.addEventListener('click', () => { draft.banks.splice(Number(b.dataset.dbank), 1); renderBanks(); update(); }));
+      document.querySelectorAll('[data-ebank]').forEach((b) => b.addEventListener('click', () => bankForm(Number(b.dataset.ebank))));
+    }
+    function bankForm(i) {
+      const b = i != null ? draft.banks[i] : null;
+      UI.formModal({
+        title: b ? 'Edit rekening' : 'Tambah rekening',
+        body: `<div data-field><label class="label" for="b-bank">Nama bank <span class="req">*</span></label><input id="b-bank" class="input" required value="${esc(b ? b.bank : '')}" placeholder="mis. Bank Mandiri"></div>
+          <div data-field><label class="label" for="b-acc">Nomor rekening <span class="req">*</span></label><input id="b-acc" class="input font-mono" required value="${esc(b ? b.account : '')}" inputmode="numeric"></div>
+          <div data-field><label class="label" for="b-holder">Atas nama <span class="req">*</span></label><input id="b-holder" class="input" required value="${esc(b ? b.holder : draft.company.name)}"></div>`,
+        onSubmit(form) {
+          if (!UI.validateRequired(form)) return false;
+          const acc = form.querySelector('#b-acc');
+          if (!/^[\d-]{6,}$/.test(acc.value.trim())) { UI.fieldError(acc, 'Nomor rekening hanya angka dan tanda hubung'); return false; }
+          const obj = { bank: form.querySelector('#b-bank').value.trim(), account: acc.value.trim(), holder: form.querySelector('#b-holder').value.trim() };
+          if (b) Object.assign(b, obj); else draft.banks.push(Object.assign({ id: 'BK-' + (Math.max(...draft.banks.map((x) => parseInt(x.id.slice(3), 10))) + 1), isDefault: false, isNew: true }, obj));
+          renderBanks(); update(); return true;
+        },
+      });
+    }
+    document.getElementById('add-bank').addEventListener('click', () => bankForm(null));
+
+    const NUMS = [['so', 'Sales Order'], ['invoice', 'Invoice'], ['po', 'PO internal'], ['client', 'Kode client'], ['vendor', 'Kode vendor'], ['revision', 'Revisi invoice']];
+    const example = (p) => p.replace('{YYYY}', '2026').replace('{MM}', '11').replace('{####}', '0001').replace('{n}', '1');
+    document.getElementById('num-edit').innerHTML = UI.disabledButton('Ubah format', 'Belum tersedia: ubah format nomor belum didukung sistem', 'btn btn-secondary btn-sm');
+    function renderNums() {
+      document.getElementById('nums').innerHTML = NUMS.map(([k, l]) => `<div><label class="label" for="num-${k}">${l}</label><input id="num-${k}" data-num-k="${k}" class="input font-mono bg-slate-50" value="${esc(draft.numbering[k])}" readonly><p class="hint">Contoh: <span class="font-mono text-slate-700" data-ex="${k}">${esc(example(draft.numbering[k]))}</span></p></div>`).join('');
+      document.querySelectorAll('[data-num-k]').forEach((el) => el.addEventListener('input', () => { draft.numbering[el.dataset.numK] = el.value; document.querySelector(`[data-ex="${el.dataset.numK}"]`).textContent = example(el.value); update(); }));
+    }
+
+    function renderPreview() {
+      const def = draft.banks.find((b) => b.isDefault) || draft.banks[0];
+      const x = Object.assign({}, sample, { so: Object.assign({}, sample.so, { ppnRate: draft.ppnRate }) });
+      x.ppn = Math.round(x.dpp * draft.ppnRate / 100); x.total = x.dpp + x.ppn;
+      document.getElementById('preview').innerHTML = Docs.invoice(x, { draft: mode === 'draft', bankId: def && def.id, settings: draft });
+      document.querySelectorAll('[data-mode]').forEach((b) => { const on = b.dataset.mode === mode; b.setAttribute('aria-pressed', on); b.classList.toggle('bg-white', on); b.classList.toggle('shadow-sm', on); b.classList.toggle('text-slate-900', on); b.classList.toggle('text-slate-600', !on); });
+    }
+    document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; renderPreview(); }));
+
+    function changes() {
+      const s = DB.settings(); const out = [];
+      const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? flat(v, p + k + '.') : [[p + k, v]]));
+      const before = Object.fromEntries(flat({ company: s.company, signers: s.signers, numbering: s.numbering, paymentTerms: s.paymentTerms, footer: s.footer, ppnRate: s.ppnRate, stamp: s.stamp }));
+      flat({ company: draft.company, signers: draft.signers, numbering: draft.numbering, paymentTerms: draft.paymentTerms, footer: draft.footer, ppnRate: draft.ppnRate, stamp: draft.stamp }).forEach(([k, v]) => { if (String(before[k]) !== String(v)) out.push({ field: k, before: String(before[k]), after: String(v) }); });
+      const bank = (arr) => arr.map((b) => `${b.bank} ${b.account}${b.isDefault ? ' (default)' : ''}`).join(', ');
+      if (bank(s.banks) !== bank(draft.banks)) out.push({ field: 'Rekening bank', before: bank(s.banks), after: bank(draft.banks) });
+      ['logoFile', 'stampFile', 'signFile', 'signTrFile'].forEach((k) => { if (draft[k] && draft[k] !== s[k]) out.push({ field: k, before: s[k] || '—', after: draft[k] }); });
+      return out;
+    }
+    function update() { renderPreview(); document.getElementById('save').disabled = !changes().length; }
+    document.getElementById('save').addEventListener('click', async () => {
+      const c = changes();
+      const r = await UI.confirm({ title: 'Simpan pengaturan dokumen?', message: `${c.length} perubahan. Hanya berlaku untuk dokumen baru; dokumen yang sudah terbit tidak berubah.`, confirmText: 'Simpan' });
+      if (!r.confirmed) return;
+      DB.saveSettings(draft);
+      DB.log({ action: 'Mengubah pengaturan dokumen', docNo: 'Pengaturan dokumen', module: 'Pengaturan Dokumen', changes: c });
+      draft = JSON.parse(JSON.stringify(DB.settings()));
+      UI.toast('Pengaturan dokumen disimpan. Berlaku untuk dokumen baru.');
+      update();
+    });
+    renderStampSwitch(); renderBanks(); renderNums(); update();
+  </script>
+</body>
+</html>

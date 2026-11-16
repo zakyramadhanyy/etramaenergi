@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pembayaran Vendor · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-8">
+    <section class="card flex gap-4 p-6" aria-label="Informasi pencatatan">
+      <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-brand-blue" data-icon="info"></span>
+      <div class="min-w-0 flex-1"><h2 class="text-base font-bold text-slate-900">Pencatatan tanpa approval</h2><p class="mt-1 text-sm text-slate-600">Catatan pembayaran <b class="font-semibold text-slate-900">tanpa approval</b>, dicatat Staf Finance setelah transfer melalui internet banking di luar sistem. Status invoice vendor &amp; PO ter-update otomatis.</p></div>
+    </section>
+    <div id="kpi" class="grid gap-5 sm:grid-cols-3"></div>
+    <section aria-labelledby="list-title">
+      <div class="sect-head"><div><h2 id="list-title" class="card-title">Riwayat pembayaran</h2><p class="card-sub">Diurutkan dari tanggal bayar terbaru</p></div><button type="button" id="add" class="btn btn-primary hidden"></button></div>
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <label class="flex h-11 items-center gap-2 rounded-2xl bg-[#F2F3F5] pl-4 pr-2 text-sm text-slate-500" for="from">Dari tanggal<input id="from" type="date" class="h-9 rounded-xl border-0 bg-transparent px-2 text-sm text-slate-900 focus:ring-0"></label>
+        <label class="flex h-11 items-center gap-2 rounded-2xl bg-[#F2F3F5] pl-4 pr-2 text-sm text-slate-500" for="to">Sampai<input id="to" type="date" class="h-9 rounded-xl border-0 bg-transparent px-2 text-sm text-slate-900 focus:ring-0"></label>
+        <div class="relative min-w-[220px] flex-1 sm:max-w-xs"><span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400" data-icon="search"></span><label class="sr-only" for="q">Cari</label><input id="q" type="search" placeholder="Cari invoice vendor, PO, rekening…" class="input !mt-0 !h-11 !pl-10"></div>
+        <label class="sr-only" for="f-vendor">Vendor</label><select id="f-vendor" class="input !mt-0 !h-11 !w-auto"><option value="">Semua vendor</option></select>
+        <label class="sr-only" for="f-po">PO</label><select id="f-po" class="input !mt-0 !h-11 !w-auto"><option value="">Semua PO</option></select>
+        <button type="button" id="export" class="btn btn-secondary ml-auto"><span data-icon="download"></span>Export Excel</button>
+      </div>
+      <div class="tbl-box mt-4">
+        <div class="overflow-x-auto"><table class="tbl min-w-[980px]">
+          <thead><tr><th>Tanggal bayar</th><th class="!text-right">Nominal</th><th>Invoice vendor · PO</th><th>Rekening tujuan</th><th>Bukti transfer</th><th>Catatan</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+        <div class="tbl-foot"><span id="foot"></span><span id="total"></span></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'pembayaran-vendor', title: 'Pembayaran Vendor', breadcrumb: ['Finance', 'Pembayaran Vendor'], perm: 'vendor' });
+    const { esc, formatRupiah: rp, icon } = UI;
+    const $ = (id) => document.getElementById(id);
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon, el.classList.contains('h-11') ? 'w-5 h-5' : 'w-4 h-4'); });
+    const canCreate = Layout.can('vendor', 'buat');
+    const rows = () => DB.all('vendorPayments').map((p) => { const vi = DB.find('vendorInvoices', (v) => v.no === p.viNo); return Object.assign({}, p, { poId: vi.poId, vendorName: DB.vendor(vi.vendorCode).name, byName: DB.user(p.by).name }); }).sort((a, b) => b.date.localeCompare(a.date));
+    $('f-vendor').insertAdjacentHTML('beforeend', DB.all('vendors').map((v) => `<option>${esc(v.name)}</option>`).join(''));
+    $('f-po').insertAdjacentHTML('beforeend', DB.all('purchaseOrders').map((o) => `<option>${esc(o.id)}</option>`).join(''));
+    function kpi() {
+      const vis = DB.all('vendorInvoices'); const ps = DB.all('vendorPayments');
+      const unpaid = vis.filter((v) => Calc.viTotal(v) - Calc.viPaid(v) > 0); const over = unpaid.filter((v) => v.due < MOCK.today);
+      $('kpi').innerHTML = [
+        View.kpiIcon('Dibayar bulan ini', View.money(Calc.sum(ps.filter((p) => p.date.startsWith('2026-11') || p.date.startsWith('2026-10')), (p) => p.amount), { size: 'lg' }), 'Oktober–November 2026', { icon: 'card', tone: 'green' }),
+        View.kpiIcon('Utang vendor belum dibayar', View.money(Calc.sum(unpaid, (v) => Calc.viTotal(v) - Calc.viPaid(v)), { size: 'lg' }), `${unpaid.length} invoice vendor`, { icon: 'clock', tone: 'amber' }),
+        View.kpiIcon('Lewat jatuh tempo', View.money(Calc.sum(over, (v) => Calc.viTotal(v) - Calc.viPaid(v)), { size: 'lg', cls: 'text-red-700' }), 'Invoice vendor overdue', { icon: 'alert', tone: 'red' }),
+      ].join('');
+    }
+    const acct = (a) => { const m = String(a).match(/^(?:Bank\s+)?([A-Za-z]+)\s+([\d-]+)\s+a\.n\.\s+(.*)$/); return m ? `<p class="flex items-center gap-2"><span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-2xs font-bold uppercase text-slate-600">${esc(m[1])}</span><span class="font-mono text-sm font-semibold text-slate-900">${esc(m[2])}</span></p><p class="mt-1 text-xs text-slate-500">a.n. ${esc(m[3])}</p>` : esc(a); };
+    const matches = () => { const q = $('q').value.trim().toLowerCase(); return rows().filter((p) => (!$('from').value || p.date >= $('from').value) && (!$('to').value || p.date <= $('to').value) && (!$('f-vendor').value || p.vendorName === $('f-vendor').value) && (!$('f-po').value || p.poId === $('f-po').value) && (!q || [p.viNo, p.poId, p.vendorName, p.account, p.note].some((x) => String(x || '').toLowerCase().includes(q)))); };
+    function render() {
+      const list = matches();
+      $('rows').innerHTML = list.length ? list.map((p) => `<tr>
+        <td><p class="text-sm font-bold text-slate-900 num">${UI.formatDate(p.date)}</p><p class="mt-0.5 text-xs text-slate-500">oleh ${esc(p.byName)}</p></td>
+        <td class="r">${View.money(p.amount, { cls: 'text-base' })}</td>
+        <td><p class="font-mono text-sm font-bold text-slate-900">${esc(p.viNo)}</p><p class="mt-1 text-sm text-slate-700">${esc(p.vendorName)}</p><p class="mt-0.5 font-mono text-xs text-brand-blue">${esc(p.poId)}</p></td>
+        <td class="min-w-[220px]">${acct(p.account)}</td>
+        <td>${p.proof ? View.fileChip(p.proof) : '<span class="text-slate-300">—</span>'}</td>
+        <td class="!whitespace-normal max-w-[220px] text-sm text-slate-700">${esc(p.note) || '<span class="text-slate-300">—</span>'}</td></tr>`).join('')
+        : `<tr><td colspan="6">${UI.emptyState({ icon: 'card', title: 'Belum ada pembayaran pada periode ini' })}</td></tr>`;
+      $('foot').textContent = `Menampilkan ${list.length} pembayaran`;
+      $('total').innerHTML = `Total dibayar <span class="ml-2 text-base">${View.money(Calc.sum(list, (p) => p.amount))}</span>`;
+    }
+    const apply = render;
+    ['from', 'to', 'q', 'f-vendor', 'f-po'].forEach((id) => $(id).addEventListener('input', render));
+    $('export').addEventListener('click', () => UI.exportCsv(`pembayaran-vendor-${MOCK.today}`, [['Tanggal bayar', 'Nominal', 'Invoice vendor', 'PO', 'Vendor', 'Rekening tujuan', 'Bukti', 'Catatan'], ...matches().map((p) => [UI.formatDate(p.date), p.amount, p.viNo, p.poId, p.vendorName, p.account, p.proof, p.note])]));
+
+    function openForm(pre) {
+      const vis = DB.all('vendorInvoices').filter((v) => Calc.viStatus(v) !== 'Paid');
+      const flagged = (v) => (v.mismatch || v.vendorDiff) && !v.checkedNote;
+      let dz;
+      UI.formModal({
+        title: 'Catat pembayaran vendor', size: 'lg', description: 'Pilih invoice vendor yang belum lunas; status invoice & PO ter-update otomatis.',
+        body: `<div data-field><label class="label" for="p-vi">Invoice vendor <span class="req">*</span></label><select id="p-vi" class="input" required><option value="">Pilih invoice vendor…</option>${vis.map((v) => `<option value="${esc(v.no)}" ${v.no === pre ? 'selected' : ''}>${esc(v.no)} — ${esc(DB.vendor(v.vendorCode).name)} · sisa ${rp(Calc.viTotal(v) - Calc.viPaid(v))}${flagged(v) ? ' ⚠ ada selisih PO' : ''}</option>`).join('')}</select><div id="p-info" class="mt-2"></div></div>
+          <div class="grid gap-5 sm:grid-cols-2"><div data-field><label class="label" for="p-date">Tanggal bayar <span class="req">*</span></label><input id="p-date" type="date" class="input" required value="${MOCK.today}"></div>
+          <div data-field><label class="label" for="p-amt">Nominal dibayar (Rp) <span class="req">*</span></label><input id="p-amt" inputmode="numeric" class="input num" required></div></div>
+          <div data-field><label class="label" for="p-acc">Rekening tujuan vendor <span class="req">*</span></label><input id="p-acc" class="input" required placeholder="Bank · no. rekening · atas nama"><p class="hint">v1.0: rekening vendor diinput manual (master rekening vendor tersedia di fase berikutnya).</p></div>
+          <div id="p-dz"></div>
+          <div><label class="label" for="p-note">Catatan</label><textarea id="p-note" rows="2" class="input" placeholder="Opsional"></textarea></div>`,
+        submitText: 'Simpan pembayaran',
+        onOpen(w) {
+          dz = UI.dropzone(w.querySelector('#p-dz'), { label: 'Bukti transfer (opsional)', accept: ['pdf', 'jpg', 'jpeg', 'png'] });
+          const sel = w.querySelector('#p-vi');
+          const sync = () => { const v = DB.find('vendorInvoices', (x) => x.no === sel.value); if (!v) { w.querySelector('#p-info').innerHTML = ''; return; } const sisa = Calc.viTotal(v) - Calc.viPaid(v); w.querySelector('#p-info').innerHTML = (flagged(v) ? `<p class="mb-1.5 flex gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">${UI.icon('alert', 'w-3.5 h-3.5 mt-px')}Invoice ini punya selisih terhadap PO. Pastikan sudah dikonfirmasi ke vendor sebelum membayar.</p>` : '') + `<p class="text-xs text-slate-600">PO <span class="font-mono">${esc(v.poId)}</span> · ${esc(DB.vendor(v.vendorCode).name)} · ${esc(v.term)} · total ${rp(Calc.viTotal(v))}, sisa <b>${rp(sisa)}</b></p>`; w.querySelector('#p-amt').value = UI.formatNumber(sisa); const last = DB.all('vendorPayments').filter((p) => DB.find('vendorInvoices', (x) => x.no === p.viNo).vendorCode === v.vendorCode).slice(-1)[0]; if (last && !w.querySelector('#p-acc').value) w.querySelector('#p-acc').value = last.account; };
+          sel.addEventListener('change', sync); sync();
+        },
+        onSubmit(f) {
+          if (!UI.validateRequired(f)) return false;
+          const v = DB.find('vendorInvoices', (x) => x.no === f.querySelector('#p-vi').value);
+          const amt = f.querySelector('#p-amt'); const n = Number(amt.value.replace(/\D/g, '')) || 0; const sisa = Calc.viTotal(v) - Calc.viPaid(v);
+          if (!n) { UI.fieldError(amt, 'Nominal wajib lebih dari 0'); return false; }
+          if (n > sisa) { UI.fieldError(amt, `Melebihi sisa tagihan ${rp(sisa)}`); return false; }
+          const before = Calc.viStatus(v); const poBefore = Calc.poSummary(DB.po(v.poId)).status;
+          const id = 'PAY-V-' + String(Math.max(...DB.all('vendorPayments').map((p) => parseInt(p.id.slice(6), 10))) + 1).padStart(4, '0');
+          DB.insert('vendorPayments', { id, viNo: v.no, date: f.querySelector('#p-date').value, amount: n, account: f.querySelector('#p-acc').value.trim(), proof: dz.files().length ? dz.files()[0].name : '', note: f.querySelector('#p-note').value.trim(), by: ctx.user.id, at: Cal.nowIso() });
+          const after = Calc.viStatus(v); const poAfter = Calc.poSummary(DB.po(v.poId)).status;
+          DB.log({ action: 'Mencatat pembayaran vendor', docNo: v.no, module: 'Pembayaran Vendor', changes: [{ field: 'Status invoice vendor', before, after }].concat(poBefore !== poAfter ? [{ field: `Status ${v.poId}`, before: poBefore, after: poAfter }] : []) });
+          UI.toast(`Pembayaran ${rp(n)} tercatat. Invoice vendor: ${after}${poBefore !== poAfter ? `, PO: ${poAfter}` : ''}.`);
+          apply(); kpi(); return true;
+        },
+      });
+    }
+    if (canCreate) { $('add').innerHTML = `${icon('plus')}Catat pembayaran`; $('add').classList.remove('hidden'); $('add').addEventListener('click', () => openForm(null)); const pre = new URLSearchParams(location.search).get('vi'); if (pre) openForm(pre); }
+    kpi(); render();
+  </script>
+</body>
+</html>

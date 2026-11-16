@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invoice Vendor · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-8">
+    <section class="card p-6" aria-labelledby="rule-title">
+      <div class="flex gap-4">
+        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-brand-blue" data-icon="shield"></span>
+        <div class="min-w-0 flex-1">
+          <h2 id="rule-title" class="text-base font-bold text-slate-900">Aturan validasi invoice vendor</h2>
+          <p class="mt-1 text-sm text-slate-600">Invoice vendor harus terhubung ke PO. Klik baris untuk melihat detail dan tahapan prosesnya.</p>
+          <div class="mt-4 grid gap-3 lg:grid-cols-3">
+            <div class="flex gap-3 rounded-2xl bg-white p-4"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-brand-blue" data-icon="network"></span><div><p class="text-sm font-bold text-slate-900">Terhubung ke PO</p><p class="mt-1 text-sm text-slate-600">Setiap invoice vendor wajib terhubung ke PO.</p></div></div>
+            <div class="flex gap-3 rounded-2xl bg-white p-4"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-50 text-red-600" data-icon="shield"></span><div><p class="text-sm font-bold text-slate-900">Ditolak oleh sistem</p><p class="mt-1 text-sm text-slate-600">Invoice yang melebihi sisa nilai PO.</p></div></div>
+            <div class="flex gap-3 rounded-2xl bg-white p-4"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600" data-icon="alert"></span><div><p class="text-sm font-bold text-slate-900">Diberi peringatan</p><p class="mt-1 text-sm text-slate-600">Ada selisih nominal atau vendor berbeda dari PO.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="kpi" class="grid gap-5 sm:grid-cols-3"></div>
+
+    <section aria-labelledby="list-title">
+      <div class="sect-head"><div><h2 id="list-title" class="card-title">Daftar invoice vendor</h2><p class="card-sub">Baris dengan peringatan ditandai merah muda</p></div><div id="add-wrap"></div></div>
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <div class="relative min-w-[240px] flex-1 sm:max-w-md"><span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400" data-icon="search"></span><label class="sr-only" for="q">Cari</label><input id="q" type="search" placeholder="Cari no. invoice, vendor, PO…" class="input !mt-0 !h-11 !pl-10"></div>
+        <label class="sr-only" for="f-status">Status</label><select id="f-status" class="input !mt-0 !h-11 !w-auto"><option value="">Semua status</option><option>Belum Dibayar</option><option>Partially Paid</option><option>Paid</option></select>
+        <label class="sr-only" for="f-vendor">Vendor</label><select id="f-vendor" class="input !mt-0 !h-11 !w-auto"><option value="">Semua vendor</option></select>
+      </div>
+      <div class="tbl-box mt-4">
+        <div class="overflow-x-auto"><table class="tbl min-w-[980px]">
+          <thead><tr><th>No. invoice vendor</th><th>Vendor · PO</th><th>Tgl · jatuh tempo</th><th class="!text-right">Total</th><th>Dibayar</th><th>Status · cek PO</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+        <div class="tbl-foot"><span id="foot"></span></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'invoice-vendor', title: 'Invoice Vendor', breadcrumb: ['Finance', 'Purchase Order', 'Invoice Vendor'], perm: 'vendor' });
+    const { esc, formatRupiah: rp, icon } = UI;
+    const canCreate = Layout.can('vendor', 'buat');
+    const flags = (v) => { const f = []; if (v.mismatch && !v.checkedNote) f.push(v.mismatch); if (v.vendorDiff && !v.checkedNote) f.push(v.vendorDiff); return f; };
+    const $ = (id) => document.getElementById(id);
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon, el.classList.contains('h-11') || el.classList.contains('h-9') ? 'w-5 h-5' : 'w-4 h-4'); });
+    const rows = () => DB.all('vendorInvoices').map((v) => Object.assign({}, v, { vendorName: DB.vendor(v.vendorCode).name, total: Calc.viTotal(v), paid: Calc.viPaid(v), status: Calc.viStatus(v), flags: flags(v) })).sort((a, b) => b.date.localeCompare(a.date));
+    $('f-vendor').insertAdjacentHTML('beforeend', DB.all('vendors').map((v) => `<option>${esc(v.name)}</option>`).join(''));
+    if (canCreate) $('add-wrap').innerHTML = `<button type="button" id="add" class="btn btn-primary">${icon('plus')}Catat invoice vendor</button>`;
+
+    function kpis() {
+      const all = rows(); const unpaid = all.filter((v) => v.total - v.paid > 0); const over = unpaid.filter((v) => v.due < MOCK.today); const chk = all.filter((v) => v.flags.length);
+      $('kpi').innerHTML = [
+        View.kpiIcon('Belum dibayar', View.money(Calc.sum(unpaid, (v) => v.total - v.paid), { size: 'lg' }), `${unpaid.length} invoice vendor`, { icon: 'clock', tone: 'amber' }),
+        View.kpiIcon('Lewat jatuh tempo', View.money(Calc.sum(over, (v) => v.total - v.paid), { size: 'lg', cls: 'text-red-700' }), `${over.length} invoice vendor overdue`, { icon: 'alert', tone: 'red' }),
+        View.kpiIcon('Perlu dicek', `<span class="text-4xl font-extrabold leading-none num">${chk.length}</span><span class="ml-2 text-base font-medium text-slate-500">invoice</span>`, chk.length ? 'Nominal tidak sesuai PO' : 'Semua cocok dengan PO', { icon: 'info', tone: 'amber' }),
+      ].join('');
+    }
+    const matches = () => { const q = $('q').value.trim().toLowerCase(); return rows().filter((v) => (!$('f-status').value || v.status === $('f-status').value) && (!$('f-vendor').value || v.vendorName === $('f-vendor').value) && (!q || [v.no, v.vendorName, v.poId, v.taxNo].some((x) => String(x || '').toLowerCase().includes(q)))); };
+    function render() {
+      const list = matches();
+      $('rows').innerHTML = list.length ? list.map((v) => {
+        const late = v.status !== 'Paid' && v.due < MOCK.today; const rest = v.total - v.paid;
+        return `<tr class="cursor-pointer hover:bg-slate-50 ${v.flags.length ? 'row-warn' : ''}">
+          <td><span class="sr-only" data-row="${esc(v.no)}"></span><p class="font-mono text-sm font-bold text-slate-900">${esc(v.no)}</p><p class="mt-1.5"><span class="inline-flex rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">${esc(v.term)}</span></p>${v.taxNo ? `<p class="mt-1.5 whitespace-nowrap font-mono text-xs text-slate-500">FP ${esc(v.taxNo)}</p>` : ''}</td>
+          <td><p class="text-sm font-bold text-slate-900">${esc(v.vendorName)}</p><p class="mt-1 font-mono text-xs text-brand-blue">${esc(v.poId)}</p></td>
+          <td><p class="text-sm font-semibold text-slate-900 num">${UI.formatDate(v.date)}</p><p class="mt-0.5 text-xs num ${late ? 'font-medium text-red-700' : 'text-slate-500'}">JT ${UI.formatDate(v.due)}${late ? ` · lewat ${Cal.daysBetween(v.due, MOCK.today)} hari` : ''}</p></td>
+          <td class="r">${View.money(v.total, { cls: 'text-base' })}<p class="mt-0.5 text-xs text-slate-500">DPP ${rp(v.dpp)}</p></td>
+          <td>${View.money(v.paid, { weight: 'font-semibold' })}<p class="mt-1 whitespace-nowrap text-xs ${rest > 0 ? 'text-slate-500' : 'font-medium text-emerald-700'}">${rest > 0 ? `Sisa <span class="font-bold text-red-700 num">${rp(rest)}</span>` : 'Lunas'}</p></td>
+          <td>${UI.badge(v.status)}${v.flags.length ? v.flags.map((f) => `<p class="mt-1.5 flex max-w-[260px] gap-1.5 text-xs font-medium text-red-700">${icon('alert', 'w-3.5 h-3.5 mt-px')}<span>${esc(f)}</span></p>`).join('') : `<p class="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-emerald-700">${icon('check', 'w-3.5 h-3.5')}Cocok dengan PO${v.checkedNote ? ' (dicek manual)' : ''}</p>`}</td></tr>`;
+      }).join('') : `<tr><td colspan="6">${UI.emptyState({ icon: 'search', title: 'Tidak ada hasil', description: 'Ubah filter atau kata kunci pencarian.' })}</td></tr>`;
+      $('foot').textContent = `Menampilkan ${list.length ? '1–' + list.length : 0} dari ${list.length} data`;
+      kpis();
+    }
+    const table = { setData: render };
+    ['q', 'f-status', 'f-vendor'].forEach((id) => $(id).addEventListener('input', render));
+    // Klik baris → drawer detail (master–detail, pola yang umum).
+    $('rows').addEventListener('click', (e) => {
+      if (e.target.closest('a, button, input, select')) return;
+      const m = e.target.closest('tr'); const key = m && m.querySelector('[data-row]');
+      if (key) openDetail(key.dataset.row);
+    });
+    render();
+
+    function openDetail(no) {
+      const v = rows().find((x) => x.no === no); if (!v) return;
+      const pays = DB.all('vendorPayments').filter((p) => p.viNo === v.no).sort((a, b) => a.date.localeCompare(b.date));
+      // Tahapan: proses eksternal (Cost Control / Budget Control) di luar sistem — tidak ada approval internal (sesuai PRD).
+      const steps = [
+        { t: 'Invoice vendor dicatat', d: `${UI.formatDateTime(v.at)} · ${esc(DB.user(v.by) ? DB.user(v.by).name : '')}`, done: true },
+        { t: 'Verifikasi Cost Control', d: 'Proses eksternal, di luar sistem', ext: true },
+        { t: 'Persetujuan Budget Control', d: 'Proses eksternal, di luar sistem', ext: true },
+        { t: v.status === 'Paid' ? 'Lunas' : v.paid ? 'Dibayar sebagian' : 'Pembayaran dicatat', d: v.paid ? `${rp(v.paid)} dari ${rp(v.total)}` : 'Belum ada pembayaran', done: v.paid > 0, cur: v.status !== 'Paid' },
+      ];
+      UI.drawer({
+        title: v.no, subtitle: `${UI.badge(v.status)} <span class="ml-1">${esc(v.vendorName)}</span>`,
+        body: `<div class="space-y-6 text-sm">
+          ${v.flags.length ? `<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">${v.flags.map((f) => `<p class="flex gap-2">${icon('alert', 'w-4 h-4 mt-px')}${esc(f)}</p>`).join('')}
+            <div class="mt-2">${UI.disabledButton('Tandai mismatch sudah dicek', 'Belum tersedia: fitur ini menunggu dukungan sistem', 'btn btn-secondary btn-sm')}</div></div>` : ''}
+          <dl class="grid grid-cols-2 gap-x-6 gap-y-4">${[['PO terkait', `<span class="font-mono">${esc(v.poId)}</span>`], ['Termin', esc(v.term)], ['Tanggal invoice', UI.formatDate(v.date)], ['Jatuh tempo', UI.formatDate(v.due)], ['No. faktur pajak', v.taxNo ? `<span class="font-mono">${esc(v.taxNo)}</span>` : '—'], ['Lampiran', v.file ? View.fileChip(v.file) : '—']].map(([k, x]) => `<div><dt class="text-xs text-slate-500">${k}</dt><dd class="mt-1 font-medium text-slate-900">${x}</dd></div>`).join('')}</dl>
+          <div class="rounded-xl bg-slate-50 p-4 num"><div class="flex justify-between"><span class="text-slate-600">DPP</span><span>${rp(v.dpp)}</span></div><div class="mt-1 flex justify-between"><span class="text-slate-600">PPN</span><span>${rp(v.ppn)}</span></div><div class="mt-2 flex justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>${rp(v.total)}</span></div></div>
+          <div><h3 class="text-sm font-semibold text-slate-900">Tahapan proses</h3>
+            <ol class="mt-3">${steps.map((x, i) => `<li class="relative flex gap-3 pb-4 last:pb-0">${i < steps.length - 1 ? '<span class="absolute left-[11px] top-7 h-[calc(100%-22px)] w-px bg-slate-200" aria-hidden="true"></span>' : ''}
+              <span class="relative grid h-6 w-6 shrink-0 place-items-center rounded-full ${x.done ? 'bg-emerald-100 text-emerald-600' : x.ext ? 'border border-dashed border-slate-300 bg-white text-slate-400' : 'border-2 border-brand-blue bg-white'}">${x.done ? icon('check', 'w-3.5 h-3.5') : x.ext ? icon('arrowRight', 'w-3 h-3') : ''}</span>
+              <div><p class="font-medium text-slate-900">${x.t} ${x.ext ? '<span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-2xs font-medium text-slate-500">Di luar sistem</span>' : ''}</p><p class="text-xs text-slate-500">${x.d}</p></div></li>`).join('')}</ol></div>
+          <div><h3 class="text-sm font-semibold text-slate-900">Riwayat pembayaran</h3>${pays.length ? `<ul class="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">${pays.map((p) => `<li class="flex items-center justify-between gap-3 px-4 py-2.5"><div><p class="font-medium num">${rp(p.amount)}</p><p class="text-xs text-slate-500">${UI.formatDate(p.date)} · ${esc(p.account)}</p></div>${p.proof ? View.fileChip(p.proof) : ''}</li>`).join('')}</ul>` : '<p class="mt-1 text-slate-500">Belum ada pembayaran.</p>'}</div>
+        </div>`,
+        footer: canCreate && v.status !== 'Paid' ? `<a class="btn btn-primary" href="pembayaran-vendor.html?vi=${encodeURIComponent(v.no)}">${icon('card')}Catat pembayaran</a>` : '',
+      });
+    }
+
+    function openForm(prePo) {
+      const pos = DB.all('purchaseOrders').map((p) => Object.assign({ p }, Calc.poSummary(p))).filter((s) => s.status !== 'Closed' && s.remainingDpp > 0);
+      const S = DB.settings();
+      let dz;
+      UI.formModal({
+        title: 'Catat invoice vendor', size: 'lg', description: 'Invoice dicocokkan otomatis dengan PO terkait.',
+        body: `<div class="grid gap-5 sm:grid-cols-2">
+          <div data-field class="sm:col-span-2"><label class="label" for="v-po">PO terkait <span class="req">*</span></label><select id="v-po" class="input" required><option value="">Pilih PO…</option>${pos.map((s) => `<option value="${esc(s.p.id)}" ${s.p.id === prePo ? 'selected' : ''}>${esc(s.p.id)} — ${esc(s.vendor.name)} (sisa DPP ${rp(s.remainingDpp)})</option>`).join('')}</select><div id="po-info" class="mt-2"></div></div>
+          <div data-field><label class="label" for="v-vendor">Vendor penerbit invoice <span class="req">*</span></label><select id="v-vendor" class="input" required>${DB.all('vendors').map((v) => `<option value="${v.code}">${esc(v.name)}</option>`).join('')}</select></div>
+          <div data-field><label class="label" for="v-no">No. invoice vendor <span class="req">*</span></label><input id="v-no" class="input" required></div>
+          <div data-field><label class="label" for="v-date">Tanggal invoice <span class="req">*</span></label><input id="v-date" type="date" class="input" required value="${MOCK.today}"></div>
+          <div data-field><label class="label" for="v-due">Jatuh tempo <span class="req">*</span></label><input id="v-due" type="date" class="input" required value="${Cal.addDays(MOCK.today, 30)}"></div>
+          <div data-field><label class="label" for="v-term">Termin yang ditagih <span class="req">*</span></label><input id="v-term" class="input" required placeholder="mis. DP 40%"></div>
+          <div><label class="label" for="v-tax">No. faktur pajak <span class="text-xs font-normal text-slate-500">opsional</span></label><input id="v-tax" class="input font-mono"></div>
+          <div data-field><label class="label" for="v-dpp">DPP (Rp) <span class="req">*</span></label><input id="v-dpp" inputmode="numeric" class="input num" required></div>
+          <div data-field><label class="label" for="v-ppn">PPN (Rp) <span class="req">*</span></label><input id="v-ppn" inputmode="numeric" class="input num" required></div>
+          <div class="sm:col-span-2 rounded-lg bg-slate-50 px-4 py-3 text-sm" id="v-check" aria-live="polite"></div>
+          <div class="sm:col-span-2" id="v-dz"></div></div>`,
+        submitText: 'Simpan invoice vendor',
+        onOpen(w) {
+          dz = UI.dropzone(w.querySelector('#v-dz'), { label: 'Lampiran invoice vendor (opsional)', accept: ['pdf', 'jpg', 'jpeg', 'png'] });
+          const q = (s) => w.querySelector(s); const dig = (v) => Number(String(v).replace(/\D/g, '')) || 0;
+          const check = () => {
+            const s = pos.find((x) => x.p.id === q('#v-po').value);
+            if (!s) { q('#po-info').innerHTML = ''; q('#v-check').innerHTML = '<span class="text-slate-500">Pilih PO untuk mulai pengecekan.</span>'; return {}; }
+            q('#po-info').innerHTML = `<p class="text-xs text-slate-600">${esc(s.vendor.name)} · PIC ${esc(s.vendor.pic)} · ToP: ${esc(s.p.top)} · DPP PO ${rp(s.dpp)}, sudah ditagih ${rp(s.invoicedDpp)}</p>`;
+            const dpp = dig(q('#v-dpp').value); const ppn = dig(q('#v-ppn').value);
+            const res = { over: dpp > s.remainingDpp, issues: [] };
+            const pct = (q('#v-term').value.match(/(\d+(?:[.,]\d+)?)\s*%/) || [])[1];
+            if (pct && dpp) { const exp = Math.round(s.dpp * Number(pct.replace(',', '.')) / 100); if (exp !== dpp) res.issues.push(`Nominal ${pct}% seharusnya ${rp(exp)} (DPP); selisih ${rp(Math.abs(dpp - exp))}.`); }
+            if (dpp && ppn && ppn !== Math.round(dpp * S.ppnRate / 100)) res.issues.push(`PPN seharusnya ${rp(Math.round(dpp * S.ppnRate / 100))} (${S.ppnRate}% × DPP).`);
+            if (q('#v-vendor').value !== s.p.vendorCode) res.vendorDiff = `Vendor berbeda dari PO (${s.vendor.name}).`;
+            const lines = [];
+            if (res.over) lines.push(`<p class="flex gap-2 font-semibold text-red-700">${icon('xCircle', 'w-4 h-4 mt-px')}Ditolak: DPP ${rp(dpp)} melebihi sisa nilai PO ${rp(s.remainingDpp)}.</p>`);
+            res.issues.concat(res.vendorDiff ? [res.vendorDiff] : []).forEach((t) => lines.push(`<p class="flex gap-2 font-medium text-red-700">${icon('alert', 'w-4 h-4 mt-px')}${esc(t)}</p>`));
+            q('#v-check').innerHTML = lines.join('') || (dpp ? `<p class="flex gap-2 font-medium text-emerald-700">${icon('checkCircle', 'w-4 h-4 mt-px')}Cocok dengan PO. Total ${rp(dpp + ppn)}.</p>` : '<span class="text-slate-500">Isi DPP & PPN untuk pengecekan.</span>');
+            q('[data-submit]').disabled = !!res.over;
+            return res;
+          };
+          q('#v-po').addEventListener('change', () => { const s = pos.find((x) => x.p.id === q('#v-po').value); if (s) q('#v-vendor').value = s.p.vendorCode; check(); });
+          q('#v-dpp').addEventListener('input', () => { q('#v-ppn').value = UI.formatNumber(Math.round(dig(q('#v-dpp').value) * S.ppnRate / 100)); check(); });
+          ['#v-ppn', '#v-term', '#v-vendor'].forEach((s) => q(s).addEventListener('input', check));
+          ['#v-dpp', '#v-ppn'].forEach((s) => q(s).addEventListener('blur', () => { q(s).value = UI.formatNumber(dig(q(s).value)); }));
+          if (prePo) q('#v-po').dispatchEvent(new Event('change')); else check();
+          w._check = check;
+        },
+        onSubmit(f) {
+          if (!UI.validateRequired(f)) return false;
+          const no = f.querySelector('#v-no');
+          if (DB.find('vendorInvoices', (v) => v.no.toLowerCase() === no.value.trim().toLowerCase())) { UI.fieldError(no, 'No. invoice vendor sudah tercatat'); return false; }
+          const res = f.closest('[class*="fixed"]')._check();
+          if (res.over) return false;
+          const dig = (v) => Number(String(v).replace(/\D/g, '')) || 0;
+          const v = { no: no.value.trim(), vendorCode: f.querySelector('#v-vendor').value, poId: f.querySelector('#v-po').value, term: f.querySelector('#v-term').value.trim(), date: f.querySelector('#v-date').value, due: f.querySelector('#v-due').value, dpp: dig(f.querySelector('#v-dpp').value), ppn: dig(f.querySelector('#v-ppn').value), taxNo: f.querySelector('#v-tax').value.trim(), file: dz.files().length ? dz.files()[0].name : '', by: ctx.user.id, at: Cal.nowIso() };
+          if (res.issues.length) v.mismatch = res.issues.join(' ');
+          if (res.vendorDiff) v.vendorDiff = res.vendorDiff;
+          DB.insert('vendorInvoices', v);
+          DB.log({ action: 'Mencatat invoice vendor', docNo: v.no, module: 'Purchase Order', reason: [v.mismatch, v.vendorDiff].filter(Boolean).join(' '), changes: [{ field: 'Status PO', before: Calc.poSummary(DB.po(v.poId)).status, after: '(ter-update)' }] });
+          UI.toast(res.issues.length || res.vendorDiff ? 'Tersimpan dengan peringatan: konfirmasi selisih ke vendor sebelum membayar.' : 'Invoice vendor tersimpan dan cocok dengan PO.', { type: res.issues.length || res.vendorDiff ? 'warning' : 'success' });
+          table.setData(rows()); return true;
+        },
+      });
+    }
+    const add = document.getElementById('add'); if (add) add.addEventListener('click', () => openForm(null));
+    const prePo = new URLSearchParams(location.search).get('po'); if (prePo && canCreate) openForm(prePo);
+  </script>
+</body>
+</html>

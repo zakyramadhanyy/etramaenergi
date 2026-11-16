@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Report Sales Order · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <section class="card no-print" aria-label="Filter report">
+      <form id="filters" class="card-body grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+        <div><label class="label" for="f-period">Periode</label><select id="f-period" class="input"><option value="year">Tahun 2026</option><option value="q4">Q4 2026 (Okt–Des)</option><option value="month">Bulan ini (Nov 2026)</option><option value="custom">Rentang tanggal…</option></select></div>
+        <div><label class="label" for="f-from">Dari</label><input id="f-from" type="date" class="input"></div>
+        <div><label class="label" for="f-to">Sampai</label><input id="f-to" type="date" class="input"></div>
+        <div><label class="label" for="f-client">Client</label><select id="f-client" class="input"></select></div>
+        <div><label class="label" for="f-bd">Sales person (Staf BD)</label><select id="f-bd" class="input"></select></div>
+        <div><label class="label" for="f-status">Status SO</label><select id="f-status" class="input"><option value="">Semua</option><option>Aktif</option><option>Selesai</option></select></div>
+        <label class="flex items-center gap-2 text-sm text-slate-700 md:col-span-3 xl:col-span-4"><input type="checkbox" id="f-pending" class="h-4 w-4 rounded border-slate-400 text-brand-blue">Sertakan SO yang menunggu approval</label>
+        <div class="flex justify-end gap-2 md:col-span-3 xl:col-span-2"><button type="button" id="x-excel" class="btn btn-secondary">Export Excel</button><button type="button" id="x-pdf" class="btn btn-secondary">Export PDF</button></div>
+      </form>
+    </section>
+    <p id="filter-note" class="text-xs text-slate-500"></p>
+    <div id="kpi" class="grid gap-5 sm:grid-cols-3"></div>
+    <section class="card" aria-labelledby="ch-title"><div class="card-head"><h2 id="ch-title" class="card-title">Tren jumlah & nilai SO per bulan</h2><span class="text-xs text-slate-500">Berdasarkan tanggal disetujui klien</span></div><div class="card-body"><div class="relative h-72"><canvas id="chart" role="img" aria-label="Grafik tren jumlah dan nilai Sales Order per bulan"></canvas></div></div></section>
+    <section class="card" aria-labelledby="tb-title"><div class="card-head"><h2 id="tb-title" class="card-title">Detail Sales Order & status penagihan</h2></div><div class="overflow-x-auto"><table class="tbl"><thead><tr><th>No. SO</th><th>Tgl disetujui</th><th>Client</th><th>Sales person</th><th class="!text-right">Nilai SO</th><th class="!text-right">Ditagih</th><th class="!text-right">Dibayar</th><th>Status</th></tr></thead><tbody id="rows"></tbody><tfoot id="foot"></tfoot></table></div></section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'finance', active: 'report-sales-order', title: 'Report Sales Order', breadcrumb: ['Finance', 'Report', 'Sales Order'], perm: 'report' });
+    const { esc, formatRupiah: rp } = UI;
+    const $ = (id) => document.getElementById(id);
+    const sos = DB.all('salesOrders').map((s) => Object.assign({}, s, { total: Calc.soTotals(s).total, bill: Calc.soBilling(s), clientName: DB.client(s.clientCode).name, bdName: DB.bd(s.bdId).name }));
+    $('f-client').innerHTML = '<option value="">Semua client</option>' + [...new Set(sos.map((s) => s.clientName))].sort().map((c) => `<option>${esc(c)}</option>`).join('');
+    $('f-bd').innerHTML = '<option value="">Semua</option>' + DB.all('stafBD').map((b) => `<option>${esc(b.name)}</option>`).join('');
+    const PERIOD = { year: ['2026-01-01', '2026-12-31'], q4: ['2026-10-01', '2026-12-31'], month: ['2026-11-01', '2026-11-30'] };
+    const setPeriod = () => { const p = PERIOD[$('f-period').value]; if (p) { [$('f-from').value, $('f-to').value] = p; } };
+    $('f-period').addEventListener('change', () => { setPeriod(); render(); });
+    ['f-from', 'f-to'].forEach((id) => $(id).addEventListener('change', () => { $('f-period').value = 'custom'; render(); }));
+    ['f-client', 'f-bd', 'f-status', 'f-pending'].forEach((id) => $(id).addEventListener('change', render));
+    setPeriod();
+    let chart;
+    const filtered = () => sos.filter((s) => s.approvedDate >= $('f-from').value && s.approvedDate <= $('f-to').value
+      && (!$('f-client').value || s.clientName === $('f-client').value) && (!$('f-bd').value || s.bdName === $('f-bd').value)
+      && (!$('f-status').value || s.status === $('f-status').value) && (s.status !== 'Menunggu Approval' || $('f-pending').checked));
+    function render() {
+      const rows = filtered();
+      const tot = Calc.sum(rows, (s) => s.total);
+      $('filter-note').textContent = `Periode ${UI.formatDate($('f-from').value)}–${UI.formatDate($('f-to').value)} · ${$('f-pending').checked ? 'termasuk' : 'hanya SO berstatus disetujui, tanpa'} SO menunggu approval.`;
+      $('kpi').innerHTML = [View.kpi('Jumlah SO', rows.length, `${rows.filter((s) => s.status === 'Menunggu Approval').length} menunggu approval`, { icon: 'fileText' }), View.kpi('Total nilai SO', rp(tot), 'Termasuk PPN', { icon: 'coins' }), View.kpi('Rata-rata nilai per SO', rp(rows.length ? tot / rows.length : 0), '', { icon: 'chart' })].join('');
+      const months = []; for (let d = $('f-from').value.slice(0, 7); d <= $('f-to').value.slice(0, 7);) { months.push(d); const [y, m] = d.split('-').map(Number); d = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; if (months.length > 36) break; }
+      const label = (m) => new Intl.DateTimeFormat('id-ID', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(m + '-01T00:00:00Z'));
+      const cnt = months.map((m) => rows.filter((s) => s.approvedDate.startsWith(m)).length);
+      const val = months.map((m) => Calc.sum(rows.filter((s) => s.approvedDate.startsWith(m)), (s) => s.total) / 1e6);
+      if (chart) chart.destroy();
+      if (window.Chart) {
+        chart = new Chart($('chart'), {
+          data: { labels: months.map(label), datasets: [
+            { type: 'bar', label: 'Nilai SO (juta Rp)', data: val, backgroundColor: '#293173', borderRadius: 4, yAxisID: 'y', order: 2 },
+            { type: 'line', label: 'Jumlah SO', data: cnt, borderColor: '#F59E0B', backgroundColor: '#F59E0B', tension: 0.3, yAxisID: 'y1', order: 1 }] },
+          options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Inter' } } }, tooltip: { callbacks: { label: (c) => (c.dataset.yAxisID === 'y' ? ` Nilai: ${rp(c.raw * 1e6)}` : ` Jumlah: ${c.raw} SO`) } } },
+            scales: { y: { beginAtZero: true, title: { display: true, text: 'Juta Rp' }, ticks: { callback: (v) => UI.formatNumber(v) }, grid: { color: '#F1F5F9' } }, y1: { beginAtZero: true, position: 'right', ticks: { stepSize: 1 }, grid: { display: false }, title: { display: true, text: 'Jumlah SO' } }, x: { grid: { display: false } } } },
+        });
+      }
+      $('rows').innerHTML = rows.length ? rows.sort((a, b) => a.approvedDate.localeCompare(b.approvedDate)).map((s) => `<tr><td>${View.soLink(s.no)}</td><td class="num">${UI.formatDate(s.approvedDate)}</td><td>${esc(s.clientName)}<p class="text-xs text-slate-500">${esc(s.project)}</p></td><td>${esc(s.bdName)}</td><td class="r font-medium">${rp(s.total)}</td><td class="r">${rp(s.bill.billed)}</td><td class="r">${rp(s.bill.paid)}</td><td>${UI.badge(s.status)}<p class="mt-1">${UI.badge(s.bill.status)}</p></td></tr>`).join('')
+        : `<tr><td colspan="8">${UI.emptyState({ icon: 'search', title: 'Tidak ada SO pada filter ini' })}</td></tr>`;
+      $('foot').innerHTML = rows.length ? `<tr><td colspan="4" class="font-semibold">Total (${rows.length} SO)</td><td class="r font-semibold">${rp(tot)}</td><td class="r font-semibold">${rp(Calc.sum(rows, (s) => s.bill.billed))}</td><td class="r font-semibold">${rp(Calc.sum(rows, (s) => s.bill.paid))}</td><td></td></tr>` : '';
+    }
+    $('x-excel').addEventListener('click', () => UI.exportCsv(`report-sales-order-${MOCK.today}`, [['No. SO', 'Tanggal disetujui', 'Client', 'Proyek', 'Sales person', 'Status SO', 'Nilai SO', 'Ditagih', 'Dibayar', 'Status penagihan'], ...filtered().map((s) => [s.no, UI.formatDate(s.approvedDate), s.clientName, s.project, s.bdName, s.status, s.total, s.bill.billed, s.bill.paid, s.bill.status])]));
+    $('x-pdf').addEventListener('click', UI.exportPdf);
+    render();
+  </script>
+</body>
+</html>

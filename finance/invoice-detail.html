@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Detail Invoice · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div id="banners" class="space-y-3"></div>
+    <section class="card">
+      <div class="card-body flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2"><h2 id="inv-no" class="font-mono text-lg font-semibold text-slate-900"></h2><span id="inv-badges" class="flex flex-wrap gap-1.5"></span></div>
+          <p id="inv-sub" class="mt-1 text-sm text-slate-600"></p>
+        </div>
+        <div id="actions" class="flex flex-wrap gap-2 no-print"></div>
+      </div>
+      <div id="stepper" class="overflow-x-auto border-t border-slate-200 px-5 py-4"></div>
+    </section>
+    <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section class="card min-w-0" data-tabs>
+        <div role="tablist" aria-label="Detail invoice" class="flex gap-6 overflow-x-auto border-b border-slate-200 px-5 no-print">
+          <button role="tab" id="t1" aria-controls="p1" aria-selected="true" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Ringkasan</button>
+          <button role="tab" id="t2" aria-controls="p2" aria-selected="false" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Dokumen &amp; Transmittal</button>
+          <button role="tab" id="t3" aria-controls="p3" aria-selected="false" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Pembayaran</button>
+          <button role="tab" id="t4" aria-controls="p4" aria-selected="false" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Versi</button>
+          <button role="tab" id="t5" aria-controls="p5" aria-selected="false" class="-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-semibold">Riwayat</button>
+        </div>
+        <div id="p1" role="tabpanel" aria-labelledby="t1" class="bg-slate-100 p-4 sm:p-6"></div>
+        <div id="p2" role="tabpanel" aria-labelledby="t2" hidden></div>
+        <div id="p3" role="tabpanel" aria-labelledby="t3" class="card-body" hidden></div>
+        <div id="p4" role="tabpanel" aria-labelledby="t4" class="card-body" hidden></div>
+        <div id="p5" role="tabpanel" aria-labelledby="t5" class="card-body" hidden></div>
+      </section>
+      <aside class="space-y-5">
+        <section class="card" aria-labelledby="sum-title"><div class="card-head"><h2 id="sum-title" class="card-title">Ringkasan tagihan</h2></div><div id="summary" class="card-body space-y-4 text-sm"></div></section>
+      </aside>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'invoice', title: 'Detail Invoice', breadcrumb: ['Finance', 'Invoice', 'Detail'], perm: 'invoice' });
+    const { esc, formatRupiah: rp, icon } = UI;
+    const $ = (id) => document.getElementById(id);
+    const no = (new URLSearchParams(location.search).get('no')) || 'INV/ETR/2026/10/0044';
+    const isStaf = Layout.can('invoice', 'buat');
+
+    function render() {
+      const raw = DB.invoice(no);
+      if (!raw) { $('page-content').innerHTML = `<div class="card">${UI.emptyState({ icon: 'receipt', title: 'Invoice tidak ditemukan', action: { label: 'Kembali ke daftar', href: 'invoice-list.html' } })}</div>`; return; }
+      const x = Calc.inv(raw);
+      const draft = !['Disetujui', 'Terkirim'].includes(x.status);
+      const sla = Calc.invoiceSla(x);
+      document.title = `${x.label} · ETrama Finance`;
+
+      /* Banner */
+      const b = [];
+      if (x.status === 'Dikembalikan') b.push(['border-red-200 bg-red-50 text-red-900', 'undo', `<b>Dikembalikan oleh ${esc(DB.user(x.history.slice(-1)[0].by).name)}:</b> ${esc(x.returnNote)}`]);
+      if (draft) b.push(['border-slate-200 bg-slate-50 text-slate-700', 'info', 'Invoice belum disetujui: PDF ditandai watermark <b>DRAFT</b> tanpa stempel & tanda tangan.']);
+      if (x.status === 'Disetujui' && sla && sla.remaining <= 0) b.push(['border-amber-300 bg-amber-50 text-amber-900', 'clock', `Kirim invoice + form transmittal ke klien ${sla.remaining < 0 ? `<b>lewat ${-sla.remaining} hari kerja</b> dari SLA H+1` : '<b>paling lambat hari ini</b> (SLA H+1)'}.`]);
+      if (x.status === 'Terkirim' && !x.transmittalSigned) b.push(['border-blue-200 bg-blue-50 text-blue-900', 'clipboard', 'Upload form transmittal yang sudah ditandatangani klien sebagai bukti terima.']);
+      $('banners').innerHTML = b.map(([c, ic, h]) => `<div class="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${c}">${icon(ic, 'w-4 h-4 mt-0.5')}<p>${h}</p></div>`).join('');
+
+      $('inv-no').textContent = x.label;
+      $('inv-badges').innerHTML = UI.badge(x.status) + (x.status === 'Terkirim' ? UI.badge(Calc.arStatus(x)) : '') + (sla ? UI.slaBadge(sla.remaining, { label: sla.label }) : '');
+      $('inv-sub').innerHTML = `<b class="text-slate-900">${esc(x.client.name)}</b> · Termin ${x.term.no} ${esc(x.term.label)} (${x.term.pct}%) · ${View.soLink(x.soNo)}`;
+
+      /* Aksi */
+      const acts = [];
+      if (isStaf && ['Draft', 'Dikembalikan'].includes(x.status)) acts.push(`<button type="button" class="btn btn-primary" id="a-submit">${icon('send')}${x.status === 'Dikembalikan' ? 'Perbaiki & ajukan ulang' : 'Ajukan review'}</button>`);
+      if (isStaf && x.status === 'Disetujui') acts.push(`<button type="button" class="btn btn-primary" id="a-send">${icon('send')}Tandai terkirim</button>`);
+      if (isStaf && x.status === 'Terkirim') acts.push(`<a href="piutang-detail.html?no=${encodeURIComponent(x.no)}" class="btn btn-primary">${icon('coins')}Buka piutang</a>`);
+      acts.push(View.reviewButtons(x, ctx.user));
+      acts.push(`<button type="button" class="btn btn-secondary" id="a-print">${icon('download')}Unduh PDF</button>`);
+      // Aksi sekunder & destruktif di menu ⋯ (Hick's law + mencegah salah klik pada aksi berisiko).
+      const more = [];
+      if (isStaf && x.status === 'Terkirim' && Calc.arStatus(x) !== 'Paid') more.push({ label: 'Catat revisi dari klien', icon: 'undo', attrs: 'id="a-revise"' });
+      if (isStaf && x.status !== 'Terkirim' && x.status !== 'Dibatalkan') more.push({ label: 'Batalkan invoice', icon: 'xCircle', danger: true, attrs: 'id="a-cancel"' });
+      if (more.length) acts.push(UI.menuButton(more, 'Aksi lain invoice'));
+      $('actions').innerHTML = acts.join('');
+      View.bindReview($('actions'), render);
+      bindActions(x);
+
+      /* Stepper */
+      $('stepper').innerHTML = View.stepper(Flow.stepper(x), x.status === 'Dikembalikan' ? 'Draft' : x.status, { returned: x.status === 'Dikembalikan' });
+
+      /* Tab */
+      $('p1').innerHTML = Docs.invoice(x, { draft });
+      const transPreview = draft ? `<div class="rounded-xl bg-white">${UI.emptyState({ icon: 'clipboard', title: 'Form transmittal tersedia setelah invoice disetujui', description: 'Form berisi daftar dokumen yang dikirim dan kolom tanda terima klien.' })}</div>` : Docs.transmittal(x, { date: x.sentAt ? Cal.dateOf(x.sentAt) : MOCK.today });
+      const bast = x.basis ? DB.find('bast', (q) => q.id === x.basis) : null;
+      const docRow = (label, file) => `<li class="flex flex-wrap items-center justify-between gap-2 px-5 py-3"><span class="text-sm text-slate-700">${label}</span>${file}</li>`;
+      $('p2').innerHTML = `<ul class="divide-y divide-slate-100 border-b border-slate-200">
+          ${docRow(`Dokumen ${esc(x.so.docType)} (${esc(x.so.clientDocNo)})`, `<span class="flex flex-wrap gap-2">${x.so.files.map(View.fileChip).join('')}</span>`)}
+          ${docRow(bast ? `${esc(bast.docType)} ${esc(bast.docNo)}` : 'BAST / berita acara', bast ? View.fileChip(bast.file) : '<span class="text-sm text-slate-400">Tidak ada (termin berpemicu tanggal)</span>')}
+          ${x.so.guarantee.length ? docRow('Dokumen jaminan', `<span class="flex flex-wrap gap-2">${x.so.guarantee.map(View.fileChip).join('')}</span>`) : ''}
+          ${docRow('Form transmittal diterima kembali (bertanda tangan klien)', x.transmittalSigned ? View.fileChip(x.transmittalSigned) : (x.status === 'Terkirim' ? UI.disabledButton(`${icon('check', 'w-3.5 h-3.5')}Tandai transmittal diterima kembali`, 'Belum tersedia: fitur ini menunggu dukungan sistem', 'btn btn-secondary btn-sm') : '<span class="text-sm text-slate-400">Setelah invoice terkirim</span>'))}
+        </ul>
+        <div class="bg-slate-100 p-4 sm:p-6">${transPreview}</div>`;
+      const pays = (x.ar && x.ar.payments) || [];
+      const paidTotal = x.status === 'Terkirim' ? Calc.paid(x, x.total) : 0;
+      $('p3').innerHTML = x.status !== 'Terkirim'
+        ? UI.emptyState({ icon: 'coins', title: 'Belum ada pembayaran', description: 'Pembayaran dicatat setelah invoice terkirim, dari halaman Piutang.' })
+        : `<div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-xs text-slate-500">Sudah dibayar</p><p class="text-lg font-semibold num">${rp(paidTotal)} <span class="text-sm font-normal text-slate-500">dari ${rp(x.total)}</span></p></div>${UI.badge(Calc.arStatus(x))}</div>
+          <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-slate-100"><span class="bg-emerald-500" style="width:${Math.min(100, Math.round((paidTotal / x.total) * 100))}%"></span></div>
+          ${pays.length ? `<ul class="mt-5 divide-y divide-slate-100 rounded-xl border border-slate-200">${pays.map((p) => `<li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3"><div><p class="font-medium num">${p.amount === 'FULL' ? rp(x.total) : rp(p.amount)}</p><p class="text-xs text-slate-500">Dibayar ${UI.formatDate(p.date)} · dicatat ${esc(DB.user(p.by).name)}</p></div>${p.proof ? View.fileChip(p.proof) : ''}</li>`).join('')}</ul>` : '<p class="mt-5 text-sm text-slate-500">Belum ada pembayaran dari klien.</p>'}
+          ${isStaf && Calc.arStatus(x) !== 'Paid' ? `<a href="piutang-detail.html?no=${encodeURIComponent(x.no)}" class="btn btn-secondary mt-4">${icon('coins')}Catat pembayaran di Piutang</a>` : ''}`;
+      const versions = x.versions && x.versions.length ? x.versions : [{ rev: 0, at: x.history[0].at, reason: 'Versi awal' }];
+      $('p4').innerHTML = `<ol class="space-y-2">${versions.slice().reverse().map((v) => `<li class="flex flex-wrap items-start justify-between gap-3 rounded-lg border ${v.rev === (x.rev || 0) ? 'border-brand-blue bg-brand-soft/40' : 'border-slate-200'} px-4 py-3">
+        <div><p class="font-mono text-sm font-semibold text-slate-900">${esc(x.no)}${v.rev ? ` Rev.${v.rev}` : ''} ${v.rev === (x.rev || 0) ? UI.badge('Versi aktif', { tone: 'blue', icon: 'check' }) : UI.badge('Arsip', { tone: 'gray', icon: 'lock' })}</p><p class="mt-1 text-sm text-slate-600">${esc(v.reason)}</p></div>
+        <span class="text-xs text-slate-500 num">${UI.formatDateTime(v.at)}</span></li>`).join('')}</ol><p class="mt-3 text-xs text-slate-500">Riwayat versi sebelumnya tetap tersimpan dan tidak dapat diubah.</p>`;
+      $('p5').innerHTML = View.timeline(x.history.slice().reverse().map((h) => ({ at: h.at, title: h.action, by: DB.user(h.by).name, note: h.note, tone: View.toneOf(h.action) })));
+
+      /* Ringkasan */
+      const S = DB.settings();
+      const bank = DB.bank(x.bankId);
+      const bankEditable = false; // Gap fe_etrama: "Ganti rekening" belum punya endpoint — rekening default dari Pengaturan Dokumen.
+      $('summary').innerHTML = `
+        <dl class="space-y-1.5 num"><div class="flex justify-between"><dt class="text-slate-500">DPP</dt><dd>${rp(x.dpp)}</dd></div><div class="flex justify-between"><dt class="text-slate-500">PPN ${x.so.ppnRate != null ? x.so.ppnRate : S.ppnRate}%</dt><dd>${rp(x.ppn)}</dd></div>
+          <div class="flex justify-between border-t border-slate-200 pt-1.5 text-base font-semibold"><dt>Total tagihan</dt><dd class="text-brand-navy">${rp(x.total)}</dd></div></dl>
+        <dl class="space-y-1.5 border-t border-slate-200 pt-3"><div class="flex justify-between"><dt class="text-slate-500">Tanggal invoice</dt><dd class="num">${UI.formatDate(x.date)}</dd></div><div class="flex justify-between"><dt class="text-slate-500">Jatuh tempo</dt><dd class="num">${UI.formatDate(x.due)}</dd></div><div class="flex justify-between"><dt class="text-slate-500">Aturan</dt><dd class="text-right">${esc(x.term.dueText)}</dd></div><div class="flex justify-between"><dt class="text-slate-500">Dibuat oleh</dt><dd>${esc(x.creator.name)}</dd></div></dl>
+        <div class="border-t border-slate-200 pt-3">
+          <label for="bank" class="text-xs font-medium text-slate-500">Rekening tujuan</label>
+          ${bankEditable ? `<select id="bank" class="input">${S.banks.map((bk) => `<option value="${bk.id}" ${bk.id === x.bankId ? 'selected' : ''}>${esc(bk.bank)} · ${esc(bk.account)}${bk.isDefault ? ' (default)' : ''}</option>`).join('')}</select><p class="hint">Pilih dari daftar rekening di Pengaturan Dokumen. Nomor rekening tidak dapat diketik bebas.</p>`
+          : `<p id="bank" class="mt-1 font-medium text-slate-900">${bank ? `${esc(bank.bank)} · <span class="font-mono">${esc(bank.account)}</span>` : '—'}</p><p class="text-xs text-slate-500">a.n. ${bank ? esc(bank.holder) : '—'}</p>${isStaf && ['Draft', 'Dikembalikan'].includes(x.status) ? `<div class="mt-2">${UI.disabledButton('Ganti rekening', 'Belum tersedia: rekening mengikuti default di Pengaturan Dokumen', 'btn btn-secondary btn-sm')}</div>` : ''}`}
+        </div>
+        ${x.status === 'Terkirim' ? `<div class="border-t border-slate-200 pt-3"><p class="text-xs font-medium text-slate-500">Piutang</p><p class="mt-1 flex items-center justify-between"><span>${UI.badge(Calc.arStatus(x))}</span><span class="font-semibold num">sisa ${rp(x.total - Calc.paid(x, x.total))}</span></p></div>` : ''}`;
+      const bankSel = document.querySelector('select#bank');
+      if (bankSel) bankSel.addEventListener('change', () => {
+        const before = DB.bank(x.bankId); const after = DB.bank(bankSel.value);
+        DB.update('invoices', (i) => i.no === no, (i) => { i.bankId = bankSel.value; });
+        DB.log({ action: 'Mengubah rekening tujuan invoice', docNo: x.label, module: 'Invoice', changes: [{ field: 'Rekening', before: `${before.bank} ${before.account}`, after: `${after.bank} ${after.account}` }] });
+        UI.toast(`Rekening tujuan diubah ke ${after.bank} ${after.account}.`); render();
+      });
+      UI.initTabs(document.querySelector('[data-tabs]'));
+    }
+
+    function bindActions(x) {
+      const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', fn); };
+      on('a-print', () => UI.exportPdf());
+      on('a-cancel', async () => {
+        const r = await UI.confirm({ title: `Batalkan ${x.label}?`, message: 'Invoice berstatus Dibatalkan dan tidak bisa diajukan atau dikirim lagi. Termin terkait dapat dibuatkan invoice baru.', confirmText: 'Batalkan invoice', tone: 'danger', note: { required: true, label: 'Alasan pembatalan', placeholder: 'mis. nilai termin berubah sesuai adendum' } });
+        if (!r.confirmed) return;
+        const before = x.status;
+        DB.update('invoices', (i) => i.no === x.no, (i) => { i.status = 'Dibatalkan'; i.history.push({ at: Cal.nowIso(), by: ctx.user.id, action: 'Invoice dibatalkan', note: r.note }); });
+        DB.log({ action: 'Membatalkan invoice', docNo: x.label, module: 'Invoice', reason: r.note, changes: [{ field: 'Status', before, after: 'Dibatalkan' }] });
+        UI.toast(`${x.label} dibatalkan.`, { type: 'warning' }); render();
+      });
+      on('a-submit', async () => {
+        const route = Flow.route(x);
+        const r = await UI.confirm({ title: `Ajukan ${x.label} untuk review?`, message: `Alur: ${route.map((s) => s.replace('Review ', '')).join(' → ')} → Disetujui. Setiap reviewer memiliki SLA H+1 hari kerja.`, confirmText: 'Ajukan' });
+        if (!r.confirmed) return;
+        Flow.submit(x.no); UI.toast(`${x.label} diajukan ke ${route[0].replace('Review ', '')}.`); render();
+      });
+      on('a-send', () => {
+        UI.formModal({
+          title: `Kirim ${x.label}`, description: 'v1.0: invoice dikirim manual oleh Staf Finance. Tandai terkirim setelah invoice + form transmittal dikirim ke klien.', size: 'lg',
+          body: `<div class="grid gap-5 sm:grid-cols-2"><div data-field><label class="label" for="s-date">Tanggal kirim <span class="req">*</span></label><input id="s-date" type="date" class="input" required value="${MOCK.today}"></div>
+            <div data-field><label class="label" for="s-ch">Dikirim melalui <span class="req">*</span></label><select id="s-ch" class="input" required><option>Email</option><option>Kurir / ekspedisi</option><option>Diantar langsung</option></select></div></div>
+            <fieldset><legend class="label">Dokumen yang dikirim (form transmittal)</legend><div class="mt-2 space-y-1.5 text-sm">${[`Invoice ${x.label}`, 'Faktur Pajak', x.basis ? 'Salinan BAST / berita acara' : `Salinan ${x.so.docType}`, 'Kuitansi'].map((d, i) => `<label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded border-slate-400 text-brand-blue" ${i === 0 ? 'disabled' : ''}>${esc(d)}</label>`).join('')}</div></fieldset>
+            <div><label class="label" for="s-note">Catatan</label><textarea id="s-note" rows="2" class="input" placeholder="Opsional"></textarea></div>`,
+          submitText: 'Tandai terkirim',
+          onSubmit(f) {
+            if (!UI.validateRequired(f)) return false;
+            const sla = Calc.invoiceSla(x);
+            const late = Cal.workdaysBetween(sla.deadline, f.querySelector('#s-date').value);
+            Flow.send(x.no, { note: `Via ${f.querySelector('#s-ch').value}. ${f.querySelector('#s-note').value.trim()}`.trim() });
+            UI.toast(late > 0 ? `Terkirim, melewati SLA H+1 sebanyak ${late} hari kerja (tercatat).` : 'Invoice ditandai terkirim dan masuk laporan piutang.', { type: late > 0 ? 'warning' : 'success' });
+            render(); return true;
+          },
+        });
+      });
+      on('a-trans', () => {
+        let dz;
+        UI.formModal({
+          title: 'Upload form transmittal bertanda tangan', body: '<div id="tr-dz"></div>', submitText: 'Upload',
+          onOpen(w) { dz = UI.dropzone(w.querySelector('#tr-dz'), { label: 'Scan form transmittal', required: true, accept: ['pdf', 'jpg', 'jpeg', 'png'] }); },
+          onSubmit() {
+            if (!dz.files().length) { dz.error('File wajib di-upload.'); return false; }
+            DB.update('invoices', (i) => i.no === x.no, (i) => { i.transmittalSigned = dz.files()[0].name; i.history.push({ at: Cal.nowIso(), by: ctx.user.id, action: 'Upload form transmittal bertanda tangan', note: '' }); });
+            DB.log({ action: 'Upload form transmittal', docNo: x.label, module: 'Invoice' });
+            UI.toast('Bukti terima tersimpan.'); render(); return true;
+          },
+        });
+      });
+      on('a-revise', async () => {
+        const r = await UI.confirm({ title: `Catat revisi dari klien untuk ${x.label}?`, message: `Sistem membuat versi Rev.${(x.rev || 0) + 1} berstatus Draft. Versi sebelumnya tetap tersimpan. Revisi melalui alur review yang sama sebelum dikirim ulang.`, confirmText: 'Buat revisi', tone: 'warning', note: { required: true, label: 'Alasan revisi dari klien', placeholder: 'mis. nama proyek harus sesuai PO' } });
+        if (!r.confirmed) return;
+        Flow.revise(x.no, r.note); UI.toast(`Rev.${(x.rev || 0) + 1} dibuat. Lengkapi lalu ajukan review.`); render();
+      });
+    }
+    render();
+  </script>
+</body>
+</html>

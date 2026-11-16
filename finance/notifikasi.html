@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notifikasi · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div id="chips" class="flex flex-wrap gap-2" role="group" aria-label="Filter jenis notifikasi"></div>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" id="unread" class="h-4 w-4 rounded border-slate-400 text-brand-blue">Hanya belum dibaca</label>
+        <button type="button" id="read-all" class="btn btn-secondary btn-sm">Tandai semua dibaca</button>
+      </div>
+    </div>
+    <section class="card"><ul id="list" class="divide-y divide-slate-100"></ul></section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    const ctx = Layout.init({ portal: 'finance', active: 'notifikasi', title: 'Notifikasi', breadcrumb: ['Finance', 'Notifikasi'] });
+    const { esc } = UI;
+    const KEY = Auth.keys.read;
+    const TYPES = { review: ['Menunggu review / approval', 'eye', 'bg-blue-50 text-blue-700'], dikembalikan: ['Invoice dikembalikan', 'undo', 'bg-red-50 text-red-700'], reminder: ['Reminder jatuh tempo', 'bell', 'bg-amber-50 text-amber-700'], sla: ['Lewat SLA', 'alert', 'bg-red-50 text-red-700'], eskalasi: ['Eskalasi piutang', 'arrowUp', 'bg-orange-50 text-orange-700'] };
+    let type = '';
+    const items = () => { const read = new Set(UI.store.get(KEY, [])); return DB.all('notifications').filter((n) => n.roles.includes(ctx.user.role)).map((n) => Object.assign({}, n, { read: n.read || read.has(n.id) })).sort((a, b) => b.time.localeCompare(a.time)); };
+    const markRead = (ids) => UI.store.set(KEY, [...new Set([...UI.store.get(KEY, []), ...ids])]);
+    function render() {
+      const all = items();
+      document.getElementById('chips').innerHTML = [['', 'Semua'], ...Object.entries(TYPES).map(([k, v]) => [k, v[0]])].map(([k, l]) => { const n = all.filter((x) => !k || x.type === k).length; return `<button type="button" data-t="${k}" aria-pressed="${type === k}" class="inline-flex items-center gap-2 h-9 rounded-[10px] border px-3 text-sm font-medium shadow-sm ${type === k ? 'border-slate-200 bg-slate-100 text-slate-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}">${l}<span class="text-xs num opacity-80">${n}</span></button>`; }).join('');
+      document.querySelectorAll('[data-t]').forEach((b) => b.addEventListener('click', () => { type = b.dataset.t; render(); }));
+      const only = document.getElementById('unread').checked;
+      const list = all.filter((x) => (!type || x.type === type) && (!only || !x.read));
+      document.getElementById('read-all').disabled = !all.some((x) => !x.read);
+      document.getElementById('list').innerHTML = list.length ? list.map((n) => { const t = TYPES[n.type]; return `<li><a href="${Layout.url(n.href)}" data-id="${n.id}" class="flex gap-4 px-5 py-4 hover:bg-slate-50 ${n.read ? '' : 'bg-brand-soft/30'}">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg ${t[2]}">${UI.icon(t[1])}</span>
+        <span class="min-w-0 flex-1"><span class="flex items-start gap-2"><span class="flex-1 text-sm ${n.read ? 'text-slate-700' : 'font-semibold text-slate-900'}">${esc(n.title)}</span>${n.read ? '' : '<span class="mt-1.5 h-2 w-2 rounded-full bg-brand-blue"></span><span class="sr-only">(belum dibaca)</span>'}</span>
+        <span class="mt-0.5 block font-mono text-xs text-slate-600">${esc(n.docNo)}</span><span class="mt-1 block text-xs text-slate-500 num">${t[0]} · ${UI.formatDateTime(n.time)}</span></span></a></li>`; }).join('')
+        : `<li>${UI.emptyState({ icon: 'bell', title: only ? 'Semua notifikasi sudah dibaca' : 'Belum ada notifikasi' })}</li>`;
+      document.querySelectorAll('[data-id]').forEach((a) => a.addEventListener('click', () => markRead([a.dataset.id])));
+    }
+    document.getElementById('unread').addEventListener('change', render);
+    document.getElementById('read-all').addEventListener('click', () => { markRead(items().map((n) => n.id)); UI.toast('Semua notifikasi ditandai sudah dibaca.'); location.reload(); });
+    render();
+  </script>
+</body>
+</html>

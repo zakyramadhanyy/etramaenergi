@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laporan Piutang · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-6">
+    <section class="card no-print" aria-label="Filter laporan">
+      <form class="card-body flex flex-wrap items-end gap-4">
+        <div><label class="label" for="f-from">Tanggal invoice dari</label><input id="f-from" type="date" class="input" value="2026-01-01"></div>
+        <div><label class="label" for="f-to">Sampai</label><input id="f-to" type="date" class="input" value="2026-11-02"></div>
+        <div class="min-w-[220px]"><label class="label" for="f-client">Client</label><select id="f-client" class="input"></select></div>
+        <div class="ml-auto flex gap-2"><button type="button" id="x-excel" class="btn btn-secondary">Export Excel</button><button type="button" id="x-pdf" class="btn btn-secondary">Export PDF</button></div>
+      </form>
+    </section>
+    <div id="kpi" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4"></div>
+    <div class="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <section class="card" aria-labelledby="c1"><div class="card-head"><h2 id="c1" class="card-title">Piutang per periode umur</h2></div><div class="card-body"><div class="relative h-64"><canvas id="chart" role="img" aria-label="Grafik piutang per periode umur"></canvas></div></div></section>
+      <section class="card" data-tabs aria-label="Rincian piutang">
+        <div role="tablist" aria-label="Rincian piutang" class="mx-5 mt-4 mb-2"><button role="tab" id="tb1" aria-controls="tp1" aria-selected="true">Per client</button><button role="tab" id="tb2" aria-controls="tp2" aria-selected="false">On Hold <span id="n-hold" class="num"></span></button><button role="tab" id="tb3" aria-controls="tp3" aria-selected="false">Dieskalasi <span id="n-esc" class="num"></span></button></div>
+        <div id="tp1" role="tabpanel" aria-labelledby="tb1" class="overflow-x-auto"><table class="tbl tbl-compact"><thead><tr><th>Client</th><th class="!text-right">Belum JT</th><th class="!text-right">Overdue</th><th class="!text-right">Total</th></tr></thead><tbody id="per-client"></tbody></table></div>
+        <div id="tp2" role="tabpanel" aria-labelledby="tb2" class="overflow-x-auto" hidden><table class="tbl"><thead><tr><th>Invoice</th><th>Client</th><th class="!text-right">Sisa</th><th>Umur</th><th>Status</th><th>Catatan / keputusan</th></tr></thead><tbody id="prob-hold"></tbody></table></div>
+        <div id="tp3" role="tabpanel" aria-labelledby="tb3" class="overflow-x-auto" hidden><table class="tbl"><thead><tr><th>Invoice</th><th>Client</th><th class="!text-right">Sisa</th><th>Umur</th><th>Status</th><th>Catatan / keputusan</th></tr></thead><tbody id="prob-esc"></tbody></table></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'finance', active: 'report-piutang', title: 'Laporan Piutang', breadcrumb: ['Finance', 'Report', 'Piutang'], perm: 'report' });
+    const { esc, formatRupiah: rp } = UI;
+    const $ = (id) => document.getElementById(id);
+    const all = Calc.receivables();
+    $('f-client').innerHTML = '<option value="">Semua client</option>' + [...new Set(all.map((x) => x.clientName))].sort().map((c) => `<option>${esc(c)}</option>`).join('');
+    ['f-from', 'f-to', 'f-client'].forEach((id) => $(id).addEventListener('change', render));
+    let chart;
+    const filtered = () => all.filter((x) => x.date >= $('f-from').value && x.date <= $('f-to').value && (!$('f-client').value || x.clientName === $('f-client').value));
+    function render() {
+      const rows = filtered(); const open = rows.filter((x) => x.outstanding > 0);
+      const s = (a) => Calc.sum(a, (x) => x.outstanding);
+      const od = open.filter((x) => x.overdue > 0);
+      $('kpi').innerHTML = [
+        View.kpi('Total piutang', rp(s(open)), `${open.length} invoice terbuka`, { icon: 'coins' }),
+        View.kpi('Total overdue', rp(s(od)), `${Math.round((s(od) / (s(open) || 1)) * 100)}% dari total piutang`, { icon: 'alert', iconCls: 'text-red-600', valueCls: 'text-red-700' }),
+        View.kpi('On Hold', rp(s(open.filter((x) => x.arStatus === 'On Hold'))), `${open.filter((x) => x.arStatus === 'On Hold').length} invoice`, { icon: 'pause' }),
+        View.kpi('Dieskalasi', rp(s(open.filter((x) => x.arStatus === 'Dieskalasi'))), `${open.filter((x) => x.arStatus === 'Dieskalasi').length} invoice`, { icon: 'arrowUp' }),
+      ].join('');
+      const per = Calc.BUCKETS.map((b) => s(open.filter((x) => x.bucket === b)) / 1e6);
+      if (chart) chart.destroy();
+      if (window.Chart) chart = new Chart($('chart'), { type: 'doughnut', data: { labels: Calc.BUCKETS, datasets: [{ label: 'Sisa piutang (juta Rp)', data: per, backgroundColor: ['#94A3B8', '#FBBF24', '#F97316', '#EF4444', '#991B1B'], borderWidth: 2, borderColor: '#fff' }] },
+        options: { maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, boxHeight: 10, font: { family: 'Plus Jakarta Sans', size: 12 } } }, tooltip: { callbacks: { label: (c) => ` ${rp(c.raw * 1e6)}` } } } } });
+      const clients = [...new Set(open.map((x) => x.clientName))].map((c) => { const l = open.filter((x) => x.clientName === c); return { c, nd: s(l.filter((x) => !x.overdue)), od: s(l.filter((x) => x.overdue)), t: s(l) }; }).sort((a, b) => b.t - a.t);
+      $('per-client').innerHTML = clients.map((r) => `<tr><td class="font-medium text-slate-900">${esc(r.c)}</td><td class="r whitespace-nowrap">${rp(r.nd)}</td><td class="r whitespace-nowrap ${r.od ? 'text-red-700 font-medium' : ''}">${rp(r.od)}</td><td class="r whitespace-nowrap font-semibold">${rp(r.t)}</td></tr>`).join('') || `<tr><td colspan="4">${UI.emptyState({ icon: 'coins', title: 'Tidak ada piutang' })}</td></tr>`;
+      const row = (x) => `<tr><td>${View.arLink(x.no)}</td><td>${esc(x.clientName)}</td><td class="r font-medium">${rp(x.outstanding)}</td><td>${esc(x.bucket)}</td><td>${UI.badge(x.arStatus)}</td><td class="!whitespace-normal max-w-sm text-sm">${x.ar.decision ? `<b>${esc(x.ar.decision.choice)}</b> — ` : ''}${esc(x.arStatus === 'On Hold' ? x.ar.hold.note : x.lastNote)}</td></tr>`;
+      const probRows = (st) => { const l = open.filter((x) => x.arStatus === st); return l.map(row).join('') || `<tr><td colspan="6">${UI.emptyState({ icon: 'checkCircle', title: `Tidak ada piutang ${st}` })}</td></tr>`; };
+      $('prob-hold').innerHTML = probRows('On Hold'); $('prob-esc').innerHTML = probRows('Dieskalasi');
+      $('n-hold').textContent = `(${open.filter((x) => x.arStatus === 'On Hold').length})`; $('n-esc').textContent = `(${open.filter((x) => x.arStatus === 'Dieskalasi').length})`;
+    }
+    $('x-excel').addEventListener('click', () => UI.exportCsv(`laporan-piutang-${MOCK.today}`, [['Client', 'No. invoice', 'Tanggal', 'Jatuh tempo', 'Nilai', 'Sisa', 'Umur', 'Status'], ...filtered().map((x) => [x.clientName, x.label, UI.formatDate(x.date), UI.formatDate(x.due), x.total, x.outstanding, x.bucket, x.arStatus])]));
+    $('x-pdf').addEventListener('click', UI.exportPdf);
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar Purchase Order · ETrama Finance</title>
+  <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script src="../assets/js/tailwind.config.js"></script>
+  <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <main id="page-content" class="space-y-8">
+    <div id="kpi" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] xl:items-stretch"></div>
+    <section aria-labelledby="list-title">
+      <div class="sect-head"><div><h2 id="list-title" class="card-title">Daftar Purchase Order</h2><p id="list-sub" class="card-sub"></p></div>
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-2"><span class="flex items-center gap-2 text-sm text-slate-600"><span class="h-1.5 w-6 rounded-full bg-blue-200"></span>Ditagih vendor</span><span class="flex items-center gap-2 text-sm text-slate-600"><span class="h-1.5 w-6 rounded-full bg-brand-blue"></span>Dibayar</span><span id="add-wrap"></span></div></div>
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <div class="relative min-w-[240px] flex-1 sm:max-w-md"><span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400" data-icon="search"></span><label class="sr-only" for="q">Cari</label><input id="q" type="search" placeholder="Cari no. PO, vendor, proyek…" class="input !mt-0 !h-11 !pl-10"></div>
+        <label class="sr-only" for="f-status">Status</label><select id="f-status" class="input !mt-0 !h-11 !w-auto"><option value="">Semua status</option><option>Open</option><option>Partially Invoiced</option><option>Fully Invoiced</option><option>Closed</option></select>
+        <label class="sr-only" for="f-vendor">Vendor</label><select id="f-vendor" class="input !mt-0 !h-11 !w-auto"><option value="">Semua vendor</option></select>
+      </div>
+      <div class="tbl-box mt-4">
+        <div class="overflow-x-auto"><table class="tbl min-w-[1040px]">
+          <thead><tr><th>PO</th><th>Vendor</th><th>Project / SO</th><th class="!text-right">Total PO</th><th>Penagihan vendor</th><th>Status</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+        <div class="tbl-foot"><span id="foot"></span></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/ui.js"></script>
+  <script src="../assets/js/domain.js"></script>
+  <script src="../assets/js/layout.js"></script>
+  <script>
+    Layout.init({ portal: 'finance', active: 'po-list', title: 'Daftar Purchase Order', breadcrumb: ['Finance', 'Purchase Order'], perm: 'vendor' });
+    const { esc, formatRupiah: rp } = UI;
+    const icon = UI.icon;
+    const $ = (id) => document.getElementById(id);
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon, 'w-4 h-4'); });
+    const all = DB.all('purchaseOrders').map((po) => Object.assign({}, po, Calc.poSummary(po), { vendorName: DB.vendor(po.vendorCode).name })).sort((a, b) => b.id.localeCompare(a.id));
+    $('f-vendor').insertAdjacentHTML('beforeend', [...new Set(all.map((r) => r.vendorName))].sort().map((v) => `<option>${esc(v)}</option>`).join(''));
+    if (Layout.can('vendor', 'buat')) $('add-wrap').innerHTML = `<a href="po-form.html" class="btn btn-primary">${icon('plus')}Tambah PO</a>`;
+
+    // KPI bergaya langkah: Open → Partially Invoiced → Fully Invoiced → Closed
+    const STEP = [['Open', 'circle', 'blue'], ['Partially Invoiced', 'half', 'amber'], ['Fully Invoiced', 'checkCircle', 'green'], ['Closed', 'lock', 'gray']];
+    $('kpi').innerHTML = STEP.map(([st, ic, tone], i) => {
+      const l = all.filter((r) => r.status === st);
+      const card = `<section class="card flex flex-col p-6"><div class="flex items-center gap-3"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl ${{ blue: 'bg-blue-50 text-brand-blue', amber: 'bg-amber-50 text-amber-600', green: 'bg-emerald-50 text-emerald-600', gray: 'bg-slate-100 text-slate-500' }[tone]}">${icon(ic, 'w-5 h-5')}</span><h3 class="min-w-0 flex-1 text-sm font-medium text-slate-700">${st}</h3><span class="shrink-0 text-xs font-medium text-slate-500">Langkah ${i + 1}</span></div>
+        <p class="mt-5 flex items-baseline gap-2"><span class="text-4xl font-extrabold leading-none text-slate-900 num">${l.length}</span><span class="text-base font-medium text-slate-500">PO</span></p>
+        <p class="mt-4 text-sm text-slate-700">${View.money(Calc.sum(l, (r) => r.total), { weight: 'font-semibold' })}</p></section>`;
+      return card + (i < STEP.length - 1 ? `<span class="hidden items-center text-slate-300 xl:flex">${icon('arrowRight', 'w-5 h-5')}</span>` : '');
+    }).join('');
+
+    const TINT = { Open: ['bg-blue-50 text-blue-700', 'bg-blue-600'], 'Partially Invoiced': ['bg-amber-50 text-amber-700', 'bg-amber-500'], 'Fully Invoiced': ['bg-emerald-50 text-emerald-700', 'bg-emerald-500'], Closed: ['bg-slate-100 text-slate-600', 'bg-slate-400'] };
+    const matches = () => { const q = $('q').value.trim().toLowerCase(); return all.filter((r) => (!$('f-status').value || r.status === $('f-status').value) && (!$('f-vendor').value || r.vendorName === $('f-vendor').value) && (!q || [r.id, r.procNo, r.vendorName, r.soNo, r.requestedBy].some((x) => String(x || '').toLowerCase().includes(q)))); };
+    function render() {
+      const list = matches();
+      $('list-sub').textContent = `${all.length} PO · diurutkan dari tanggal terbaru`;
+      $('rows').innerHTML = list.length ? list.map((r) => {
+        const pi = r.total ? Math.min(100, (r.invoiced / r.total) * 100) : 0; const pp = r.total ? Math.min(100, (r.paid / r.total) * 100) : 0; const t = TINT[r.status];
+        return `<tr class="cursor-pointer hover:bg-slate-50">
+          <td><button type="button" class="font-mono text-sm font-medium text-brand-blue hover:underline" data-po="${esc(r.id)}">${esc(r.id)}</button><p class="mt-1 text-sm font-bold text-slate-900 num">${UI.formatDate(r.date)}</p><p class="mt-0.5 text-xs text-slate-500">Ref ${esc(r.procNo)}</p></td>
+          <td><p class="text-sm font-bold text-slate-900">${esc(r.vendorName)}</p><p class="mt-1 text-xs text-slate-500">${esc(r.requestedBy)}</p></td>
+          <td>${r.soNo ? `<span class="font-mono text-xs">${View.soLink(r.soNo)}</span>` : '<span class="text-slate-300">—</span>'}</td>
+          <td class="r">${View.money(r.total, { cls: 'text-base' })}</td>
+          <td class="min-w-[230px]"><div class="flex items-center justify-between text-sm"><span class="text-slate-500">Ditagih</span>${View.money(r.invoiced, { weight: 'font-semibold' })}</div><div class="mt-1.5 flex items-center justify-between text-sm"><span class="text-slate-500">Dibayar</span>${View.money(r.paid, { weight: 'font-semibold' })}</div>
+            <div class="relative mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label="Ditagih ${Math.round(pi)}%, dibayar ${Math.round(pp)}%"><span class="absolute inset-y-0 left-0 rounded-full bg-blue-200" style="width:${pi}%"></span><span class="absolute inset-y-0 left-0 rounded-full bg-brand-blue" style="width:${pp}%"></span></div></td>
+          <td><span class="inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-semibold ${t[0]}"><span class="h-1.5 w-1.5 rounded-full ${t[1]}"></span>${esc(r.status)}</span></td></tr>`;
+      }).join('') : `<tr><td colspan="6">${UI.emptyState({ icon: 'cart', title: 'Belum ada PO', description: 'Input PO dari file yang dikirim Procurement.' })}</td></tr>`;
+      $('foot').textContent = `Menampilkan ${list.length} dari ${all.length} PO`;
+    }
+    ['q', 'f-status', 'f-vendor'].forEach((id) => $(id).addEventListener('input', render));
+    $('rows').addEventListener('click', (e) => {
+      if (e.target.closest('a')) return;
+      const tr = e.target.closest('tr'); const b = tr && tr.querySelector('[data-po]'); if (b) open(b.dataset.po);
+    });
+    render();
+    function open(id) {
+      const po = DB.po(id); const s = Calc.poSummary(po);
+      UI.drawer({
+        title: po.id, subtitle: `${UI.badge(s.status)} <span class="ml-1">${esc(s.vendor.name)} · PIC ${esc(s.vendor.pic)}</span>`, width: 'max-w-2xl',
+        body: `<dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm"><div><dt class="text-xs text-slate-500">No. PO procurement</dt><dd class="font-mono">${esc(po.procNo)}</dd></div><div><dt class="text-xs text-slate-500">Tanggal PO</dt><dd>${UI.formatDate(po.date)}</dd></div><div><dt class="text-xs text-slate-500">Diajukan oleh</dt><dd>${esc(po.requestedBy)}</dd></div><div><dt class="text-xs text-slate-500">Project / SO</dt><dd>${po.soNo ? View.soLink(po.soNo) : '—'}</dd></div><div class="col-span-2"><dt class="text-xs text-slate-500">ToP vendor</dt><dd>${esc(po.top)}</dd></div><div class="col-span-2"><dt class="text-xs text-slate-500">File PO</dt><dd class="mt-1">${View.fileChip(po.file)}</dd></div></dl>
+          <table class="tbl tbl-compact mt-5"><thead><tr><th>Item</th><th class="!text-right">Qty</th><th class="!text-right">Harga</th><th class="!text-right">Subtotal</th></tr></thead><tbody>${s.lines.map((l) => `<tr><td>${esc(l.name)}<p class="text-xs text-slate-500">${esc(l.spec)}</p></td><td class="r">${UI.formatNumber(l.qty)} ${esc(l.unit)}</td><td class="r">${rp(l.price)}</td><td class="r">${rp(l.subtotal)}${l.disc ? `<p class="text-xs text-slate-500">disc ${rp(l.disc)}</p>` : ''}</td></tr>`).join('')}</tbody>
+          <tfoot class="num"><tr><td colspan="3" class="text-right">DPP</td><td class="r">${rp(s.dpp)}</td></tr><tr><td colspan="3" class="!border-0 text-right">PPN</td><td class="r !border-0">${rp(s.ppn)}</td></tr>${s.pph ? `<tr><td colspan="3" class="!border-0 text-right">PPh ${po.pph}%</td><td class="r !border-0">-${rp(s.pph)}</td></tr>` : ''}<tr><td colspan="3" class="text-right font-semibold">Total PO</td><td class="r font-semibold">${rp(s.total)}</td></tr></tfoot></table>
+          <h3 class="mt-6 text-sm font-semibold text-slate-900">Invoice vendor</h3>
+          ${s.vis.length ? `<ul class="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">${s.vis.map((v) => `<li class="flex items-center justify-between gap-3 px-3 py-2 text-sm"><span><span class="font-mono">${esc(v.no)}</span><span class="block text-xs text-slate-500">${esc(v.term)} · ${UI.formatDate(v.date)}</span></span><span class="text-right"><span class="block font-medium num">${rp(Calc.viTotal(v))}</span>${UI.badge(Calc.viStatus(v))}</span></li>`).join('')}</ul><p class="mt-2 text-xs text-slate-500">Sisa DPP belum ditagih: <b class="num">${rp(s.remainingDpp)}</b></p>` : '<p class="mt-2 text-sm text-slate-500">Belum ada invoice vendor.</p>'}`,
+        footer: Layout.can('vendor', 'buat') && s.status !== 'Closed' && s.remainingDpp > 0 ? `<a href="invoice-vendor.html?po=${encodeURIComponent(po.id)}" class="btn btn-primary">Catat invoice vendor</a>` : '',
+      });
+    }
+  </script>
+</body>
+</html>
